@@ -1,6 +1,9 @@
 -- ==========================================
 -- Supabase Schema for Portrait Kiosk Event Web App
 -- ==========================================
+-- Supabase SQL Editor에 붙여넣을 전체 스크립트(스키마+INSERT)는
+-- supabase/supabase-sql-editor.sql 파일을 사용하세요.
+-- ==========================================
 
 -- 1. Create settings table
 CREATE TABLE IF NOT EXISTS public.settings (

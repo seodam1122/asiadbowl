@@ -1,3 +1,5 @@
+import { isKioskStoragePublicUrl } from './kiosk-storage-url';
+import { persistImageToServer } from './media-upload';
 import { supabase, isSupabaseConfigured } from './supabase';
 import {
   buildAprilMayDummyParticipation,
@@ -173,6 +175,43 @@ async function externalizeImageUrl(storageKey: string, imageUrl: string): Promis
   return toLocalMediaRef(storageKey);
 }
 
+function storageObjectPath(storageKey: string): string {
+  if (storageKey === 'settings-ad') return 'settings/ad-banner';
+  if (storageKey.startsWith('prizes/')) return storageKey;
+  if (storageKey.startsWith('prize-')) return `prizes/${storageKey}`;
+  return storageKey;
+}
+
+/** Supabase Storage 업로드(설정 시) 또는 로컬 IndexedDB 저장 */
+async function resolveImageForPersistence(
+  storageKey: string,
+  imageUrl: string
+): Promise<string> {
+  const needsUpload = isDataUrl(imageUrl) || isLocalMediaRef(imageUrl);
+
+  if (isSupabaseConfigured && supabase && needsUpload) {
+    return persistImageToServer(storageObjectPath(storageKey), imageUrl);
+  }
+
+  if (isDataUrl(imageUrl)) {
+    return externalizeImageUrl(storageKey, imageUrl);
+  }
+
+  return imageUrl;
+}
+
+function assertPrizeImagesPersistedToServer(prizes: Prize[]): void {
+  if (!isSupabaseConfigured) return;
+  const bad = prizes.find(
+    (p) => isDataUrl(p.image_url) || isLocalMediaRef(p.image_url)
+  );
+  if (bad) {
+    throw new Error(
+      `'${bad.name}' 경품 이미지를 서버에 올리지 못했습니다. 파일을 다시 업로드한 뒤 저장해 주세요.`
+    );
+  }
+}
+
 async function hydratePrizes(prizes: Prize[]): Promise<Prize[]> {
   return Promise.all(
     prizes.map(async (prize) => ({
@@ -186,7 +225,7 @@ async function externalizePrizesForStorage(prizes: Prize[]): Promise<Prize[]> {
   return Promise.all(
     prizes.map(async (prize) => ({
       ...prize,
-      image_url: await externalizeImageUrl(`prize-${prize.id}`, prize.image_url),
+      image_url: await resolveImageForPersistence(`prize-${prize.id}`, prize.image_url),
     }))
   );
 }
@@ -220,7 +259,7 @@ async function hydrateSettings(settings: KioskSettings): Promise<KioskSettings> 
 }
 
 async function externalizeSettingsForStorage(settings: KioskSettings): Promise<KioskSettings> {
-  const ad_image_url = await externalizeImageUrl('settings-ad', settings.ad_image_url);
+  const ad_image_url = await resolveImageForPersistence('settings-ad', settings.ad_image_url);
   return { ...settings, ad_image_url };
 }
 
@@ -254,35 +293,10 @@ async function getLocalSettingsHydrated(): Promise<KioskSettings> {
 
 const PRIZES_CUSTOM_FLAG = 'kiosk_prizes_custom';
 
-function hasCustomPrizeCache(): boolean {
-  return isBrowser && localStorage.getItem(PRIZES_CUSTOM_FLAG) === '1';
-}
-
-/** Prefer locally saved admin config (names, odds, images). */
-function mergePrizesWithLocal(remote: Prize[], local: Prize[]): Prize[] {
-  if (!hasCustomPrizeCache()) {
-    return remote;
-  }
-  return remote.map((prize) => {
-    const localPrize = local.find((p) => p.id === prize.id);
-    if (!localPrize) {
-      return prize;
-    }
-    return {
-      ...prize,
-      name: localPrize.name,
-      probability: localPrize.probability,
-      image_url: localPrize.image_url,
-    };
-  });
-}
-
 // Database API Implementation
 export const db = {
   // Settings API
   async getSettings(): Promise<KioskSettings> {
-    const local = await getLocalSettingsHydrated();
-
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
@@ -291,54 +305,45 @@ export const db = {
           .eq('id', 1)
           .single();
         if (error) throw error;
-        const remote = {
-          ...data,
-          ad_image_url: await hydrateImageUrl(data.ad_image_url),
-        };
-        const useLocalBanner =
-          local.ad_image_url &&
-          local.ad_image_url !== remote.ad_image_url &&
-          (isDataUrl(local.ad_image_url) || isLocalMediaRef(data.ad_image_url));
-        return useLocalBanner ? { ...remote, ad_image_url: local.ad_image_url } : remote;
+        const settings = await hydrateSettings(data as KioskSettings);
+        setLocalData('kiosk_settings', settings);
+        return settings;
       } catch (err) {
         console.error('Supabase getSettings failed, using fallback:', err);
       }
     }
-    return local;
+    return getLocalSettingsHydrated();
   },
 
   async updateSettings(updates: Partial<KioskSettings>): Promise<KioskSettings> {
-    const current = await getLocalSettingsHydrated();
-    const updated = { ...current, ...updates };
-    const forStorage = await externalizeSettingsForStorage(updated);
-    setLocalData('kiosk_settings', forStorage);
+    const current = await this.getSettings();
+    const merged = { ...current, ...updates };
+    const persisted = await externalizeSettingsForStorage(merged);
+    setLocalData('kiosk_settings', persisted);
 
     if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('settings')
-          .update(updates)
-          .eq('id', 1)
-          .select()
-          .single();
-        if (error) throw error;
-        return updated;
-      } catch (err) {
-        console.error('Supabase updateSettings failed, using fallback:', err);
+      const { error } = await supabase
+        .from('settings')
+        .update({
+          active_game: persisted.active_game,
+          ad_title: persisted.ad_title,
+          ad_subtitle: persisted.ad_subtitle,
+          ad_image_url: persisted.ad_image_url,
+          admin_password: persisted.admin_password,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1);
+      if (error) {
+        console.error('Supabase updateSettings failed:', error);
+        throw new Error('서버에 광고 설정을 저장하지 못했습니다.');
       }
     }
-    return updated;
+
+    return hydrateSettings(persisted);
   },
 
   // Prizes API
   async getPrizes(): Promise<Prize[]> {
-    const local = await getLocalPrizesHydrated();
-
-    // Admin-saved local config is the source of truth for kiosk display & draws
-    if (hasCustomPrizeCache()) {
-      return local;
-    }
-
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
@@ -346,13 +351,17 @@ export const db = {
           .select('*')
           .order('id', { ascending: true });
         if (error) throw error;
-        const remote = await hydratePrizes(data);
-        return normalizePrizeList(mergePrizesWithLocal(remote, local));
+        const list = normalizePrizeList(await hydratePrizes(data as Prize[]));
+        setLocalData('kiosk_prizes', list);
+        if (isBrowser) {
+          localStorage.setItem(PRIZES_CUSTOM_FLAG, '1');
+        }
+        return list;
       } catch (err) {
         console.error('Supabase getPrizes failed, using fallback:', err);
       }
     }
-    return local;
+    return getLocalPrizesHydrated();
   },
 
   async getPrizeById(id: number): Promise<Prize | null> {
@@ -360,29 +369,50 @@ export const db = {
     return prizes.find((p) => p.id === id) ?? null;
   },
 
+  /** 경품 이미지만 즉시 Storage 업로드 (관리자에서 파일 선택 직후) */
+  async uploadPrizeImage(prizeId: number, imageUrl: string): Promise<string> {
+    const id = Number(prizeId);
+    if (!id || Number.isNaN(id)) {
+      throw new Error('경품 ID가 올바르지 않습니다.');
+    }
+    const url = await resolveImageForPersistence(`prizes/prize-${id}`, imageUrl);
+    if (isDataUrl(url) || isLocalMediaRef(url)) {
+      throw new Error('이미지가 서버 Storage에 올라가지 않았습니다. Supabase 설정을 확인하세요.');
+    }
+    if (isSupabaseConfigured && !isKioskStoragePublicUrl(url)) {
+      throw new Error(
+        '업로드된 주소가 Supabase Storage URL이 아닙니다. 파일을 다시 업로드하거나 .env.local을 확인하세요.'
+      );
+    }
+    return url;
+  },
+
   async savePrizeList(prizesList: Prize[]): Promise<Prize[]> {
-    const forStorage = await externalizePrizesForStorage(prizesList);
-    setLocalData('kiosk_prizes', forStorage);
+    const persisted = normalizePrizeList(await externalizePrizesForStorage(prizesList));
+    assertPrizeImagesPersistedToServer(persisted);
+    setLocalData('kiosk_prizes', persisted);
     if (isBrowser) {
       localStorage.setItem(PRIZES_CUSTOM_FLAG, '1');
     }
 
     if (isSupabaseConfigured && supabase) {
-      try {
-        const forRemote = prizesList.map((prize) => ({
-          ...prize,
-          image_url:
-            isDataUrl(prize.image_url) || isLocalMediaRef(prize.image_url)
-              ? DEFAULT_PRIZES.find((d) => d.id === prize.id)?.image_url ?? prize.image_url
-              : prize.image_url,
-        }));
-        const { error } = await supabase.from('prizes').upsert(forRemote);
-        if (error) throw error;
-      } catch (err) {
-        console.error('Supabase savePrizeList failed, using local cache:', err);
+      const { error } = await supabase.from('prizes').upsert(
+        persisted.map((prize) => ({
+          id: prize.id,
+          name: prize.name,
+          image_url: prize.image_url,
+          probability: prize.probability,
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: 'id' }
+      );
+      if (error) {
+        console.error('Supabase savePrizeList failed:', error);
+        throw new Error(`서버에 경품 설정을 저장하지 못했습니다: ${error.message}`);
       }
     }
-    return normalizePrizeList(prizesList);
+
+    return persisted;
   },
 
   // Helper to migrate existing logs that don't have coupons

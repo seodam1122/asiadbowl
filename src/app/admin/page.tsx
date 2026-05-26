@@ -10,6 +10,7 @@ import {
   normalizePhoneNumber,
 } from '@/lib/db';
 import { fileToCompressedDataUrl } from '@/lib/image-utils';
+import { isKioskStoragePublicUrl, stripUrlCacheBust } from '@/lib/kiosk-storage-url';
 import { 
   Lock, KeyRound, ShieldAlert, Users, Image as ImageIcon, 
   Settings as SettingsIcon, Download, Save, CheckCircle2, 
@@ -436,7 +437,11 @@ export default function AdminPage() {
         ad_image_url: adImageUrl
       });
       setSettings(updated);
-      setSaveStatus({ type: 'success', message: '광고 설정이 성공적으로 저장되었습니다.' });
+      setAdImageUrl(updated.ad_image_url);
+      setSaveStatus({
+        type: 'success',
+        message: '광고 설정이 서버에 저장되었습니다. 키오스크에서도 동일 이미지가 표시됩니다.',
+      });
     } catch (err) {
       console.error(err);
       setSaveStatus({ type: 'error', message: '광고 설정 저장 중 오류가 발생했습니다.' });
@@ -476,14 +481,36 @@ export default function AdminPage() {
     );
   };
 
-  const processPrizeImageFile = (file: File, prizeIndex: number) => {
-    const prizeLabel = prizeEdits[prizeIndex]?.name || `경품 ${prizeIndex + 1}`;
-    void readImageFileAsDataUrl(
-      file,
-      (dataUrl) => handlePrizeImageChange(prizeIndex, dataUrl),
-      `'${prizeLabel}' 경품 이미지가 불러와졌습니다. 하단의 저장 버튼을 누르면 적용됩니다.`,
-      512
-    );
+  const processPrizeImageFile = async (file: File, prizeIndex: number) => {
+    const prize = prizeEdits[prizeIndex];
+    if (!prize) return;
+    const prizeLabel = prize.name || `경품 ${prizeIndex + 1}`;
+
+    if (file.size > 2.5 * 1024 * 1024) {
+      const errorMsg = `이미지 파일 크기는 최대 2.5MB까지만 허용됩니다.\n(선택하신 파일 크기: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`;
+      alert(errorMsg);
+      setSaveStatus({ type: 'error', message: errorMsg });
+      return;
+    }
+
+    setSaveStatus({ type: null, message: '' });
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file, 512, 0.82);
+      const serverUrl = await db.uploadPrizeImage(prize.id, dataUrl);
+      handlePrizeImageChange(prizeIndex, serverUrl);
+      setSaveStatus({
+        type: 'success',
+        message: `'${prizeLabel}' 이미지가 서버에 업로드되었습니다. 하단 저장 버튼으로 이름·확률을 함께 저장하세요.`,
+      });
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : '경품 이미지 서버 업로드에 실패했습니다.';
+      setSaveStatus({ type: 'error', message });
+      alert(message);
+    }
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -524,7 +551,7 @@ export default function AdminPage() {
   const handlePrizeImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activePrizeUploadIndex !== null) {
-      processPrizeImageFile(file, activePrizeUploadIndex);
+      void processPrizeImageFile(file, activePrizeUploadIndex);
     }
     e.target.value = '';
   };
@@ -548,7 +575,7 @@ export default function AdminPage() {
         alert('이미지 파일만 업로드할 수 있습니다.');
         return;
       }
-      processPrizeImageFile(file, prizeIndex);
+      void processPrizeImageFile(file, prizeIndex);
     }
   };
 
@@ -571,11 +598,18 @@ export default function AdminPage() {
     try {
       const updatedPrizes = await db.savePrizeList(prizeEdits);
       setPrizes(updatedPrizes);
-      
-      setSaveStatus({ type: 'success', message: '경품 설정이 성공적으로 반영되었습니다.' });
+      setPrizeEdits(JSON.parse(JSON.stringify(updatedPrizes)));
+
+      setSaveStatus({
+        type: 'success',
+        message: '경품 설정이 서버에 저장되었습니다. 키오스크·QR 쿠폰에서도 동일 이미지가 사용됩니다.',
+      });
     } catch (err) {
       console.error(err);
-      setSaveStatus({ type: 'error', message: '설정 저장 중 에러가 발생했습니다.' });
+      setSaveStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : '설정 저장 중 에러가 발생했습니다.',
+      });
     }
   };
 
@@ -1498,14 +1532,27 @@ export default function AdminPage() {
                         </div>
                         <div className="space-y-1">
                           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">또는 이미지 URL 입력</span>
-                          <input
-                            type="text"
-                            value={prize.image_url}
-                            onChange={(e) => handlePrizeImageChange(idx, e.target.value)}
-                            placeholder="https://... 또는 base64 주소"
-                            className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs text-zinc-800 outline-none focus:border-pink-500/40 transition-colors"
-                            required
-                          />
+                          {prize.image_url.startsWith('data:image') ? (
+                            <p className="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
+                              로컬 미리보기만 있습니다. 파일을 다시 업로드하면 서버 URL이 생성됩니다.
+                            </p>
+                          ) : isKioskStoragePublicUrl(prize.image_url) ? (
+                            <div className="space-y-1">
+                              <p className="text-[9px] text-emerald-600 font-bold">Supabase Storage URL (서버 저장됨)</p>
+                              <p className="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-[10px] text-zinc-700 font-mono break-all leading-relaxed">
+                                {stripUrlCacheBust(prize.image_url)}
+                              </p>
+                            </div>
+                          ) : (
+                            <input
+                              type="url"
+                              value={prize.image_url}
+                              onChange={(e) => handlePrizeImageChange(idx, e.target.value)}
+                              placeholder="https://... 또는 이미지 파일 업로드"
+                              className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs text-zinc-800 outline-none focus:border-pink-500/40 transition-colors"
+                              required
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
