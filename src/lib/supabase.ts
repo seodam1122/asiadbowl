@@ -12,3 +12,11 @@ export const isSupabaseConfigured =
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+/** 관리자 화면 연결 상태 표시용 */
+export function getSupabaseConnectionHint(): string {
+  if (!isSupabaseConfigured) {
+    return 'Supabase 미연결 — .env.local 설정 후 npm run dev 재시작 필요';
+  }
+  return `Supabase 연결됨 (${supabaseUrl.replace(/^https?:\/\//, '').slice(0, 40)}…)`;
+}

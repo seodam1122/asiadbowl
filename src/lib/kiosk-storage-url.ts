@@ -29,3 +29,8 @@ export function isKioskStoragePublicUrl(url: string): boolean {
 export function stripUrlCacheBust(url: string): string {
   return url.split('?')[0];
 }
+
+/** 브라우저에만 있는 임시 이미지 (Storage URL 아님) */
+export function isEmbeddedImageData(url: string): boolean {
+  return url.startsWith('data:') || url.startsWith('local-media:');
+}

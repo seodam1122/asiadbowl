@@ -78,42 +78,43 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
   const digits = phoneNumber.replace(/\D/g, '');
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-6">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-9 px-6 pb-[10vh] pt-2 -translate-y-5">
       {/* Title section */}
-      <div className="text-center pt-8">
-        <div className="inline-flex p-3.5 bg-gradient-to-tr from-pink-500/10 to-indigo-500/10 rounded-full border border-pink-500/20 mb-4 animate-bounce">
-          <Phone className="w-8 h-8 text-pink-500" />
+      <div className="w-full text-center">
+        <div className="mb-5 inline-flex rounded-full border border-pink-500/20 bg-gradient-to-tr from-pink-500/10 to-indigo-500/10 p-6">
+          <Phone className="h-14 w-14 text-pink-500" />
         </div>
-        <h2 className="text-2xl font-black tracking-tight text-zinc-800">
+        <h2 className="text-5xl font-black tracking-tight text-zinc-800">
           본인 인증
         </h2>
-        <p className="text-sm text-zinc-500 mt-2 font-medium">
+        <p className="mt-3 text-xl font-medium text-zinc-500">
           중복 참여 방지를 위해 휴대폰 번호를 입력해 주세요.
         </p>
       </div>
 
       {/* Input panel */}
-      <div className="my-6">
-        <div className="w-full py-4 px-6 rounded-2xl bg-zinc-100 border border-zinc-200 text-center relative overflow-hidden flex items-center justify-center min-h-[72px]">
+      <div className="w-full">
+        <div className="relative flex min-h-[126px] w-full items-center justify-center overflow-hidden rounded-3xl border-2 border-zinc-200 bg-zinc-100 px-8 py-5 text-center">
           {phoneNumber ? (
-            <span className="text-3xl font-mono font-black tracking-widest text-zinc-800">
+            <span className="text-5xl font-mono font-black tracking-widest text-zinc-800 sm:text-6xl">
               {phoneNumber}
             </span>
           ) : (
-            <span className="text-xl text-zinc-400 font-medium">010-0000-0000</span>
+            <span className="text-3xl font-medium text-zinc-400">010-0000-0000</span>
           )}
           {loading && (
-            <div className="absolute right-4">
-              <Loader2 className="w-5 h-5 animate-spin text-pink-500" />
+            <div className="absolute right-6">
+              <Loader2 className="h-9 w-9 animate-spin text-pink-500" />
             </div>
           )}
         </div>
 
         {/* Error / Status Pop-up inside user UI */}
         {error && (
-          <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex gap-3 items-start animate-pulse">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-xs font-semibold text-red-600 leading-normal whitespace-pre-line">
+          <div className="mt-5 flex items-start gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 animate-pulse">
+            <AlertCircle className="mt-0.5 h-9 w-9 shrink-0 text-red-500" />
+            <p className="text-base font-semibold leading-normal text-red-600 whitespace-pre-line">
               {error}
             </p>
           </div>
@@ -121,15 +122,15 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
       </div>
 
       {/* Keypad and Action Buttons */}
-      <div className="w-full space-y-4 pb-4">
+      <div className="w-full space-y-6">
         {/* On screen keyboard grid */}
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-4">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
             <button
               key={num}
               type="button"
               onClick={() => handleKeyPress(num)}
-              className="py-4 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xl font-bold font-mono text-zinc-800 touch-press transition-colors shadow-sm select-none"
+              className="touch-press select-none rounded-3xl border border-zinc-200 bg-white py-7 text-4xl font-bold font-mono text-zinc-800 shadow-sm transition-colors hover:bg-zinc-50"
             >
               {num}
             </button>
@@ -137,33 +138,33 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
           <button
             type="button"
             onClick={() => handleKeyPress('clear')}
-            className="py-4 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 text-xs font-bold text-zinc-500 touch-press select-none"
+            className="touch-press select-none rounded-3xl bg-zinc-100 py-7 text-base font-bold text-zinc-500 hover:bg-zinc-200/80"
           >
             전체삭제
           </button>
           <button
             type="button"
             onClick={() => handleKeyPress('0')}
-            className="py-4 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xl font-bold font-mono text-zinc-800 touch-press select-none"
+            className="touch-press select-none rounded-3xl border border-zinc-200 bg-white py-7 text-4xl font-bold font-mono text-zinc-800 hover:bg-zinc-50"
           >
             0
           </button>
           <button
             type="button"
             onClick={() => handleKeyPress('backspace')}
-            className="py-4 rounded-xl bg-zinc-100 hover:bg-zinc-200/80 flex items-center justify-center text-zinc-500 touch-press select-none"
+            className="flex touch-press select-none items-center justify-center rounded-3xl bg-zinc-100 py-7 text-zinc-500 hover:bg-zinc-200/80"
           >
-            <Delete className="w-5 h-5" />
+            <Delete className="h-10 w-10" />
           </button>
         </div>
 
         {/* Consent */}
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-          <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
+        <div className="space-y-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-7">
+          <p className="text-sm leading-relaxed font-medium text-zinc-600">
             <span className="font-bold text-zinc-800">[필수] </span>
             이벤트 참여·중복 방지·당첨 안내(카카오 알림톡)를 위해 휴대폰 번호를 수집·이용합니다. (보유 기간: 이벤트 종료 후 1년)
           </p>
-          <label className="flex items-start gap-3 cursor-pointer select-none touch-press">
+          <label className="flex cursor-pointer select-none items-start gap-4 touch-press">
             <input
               type="checkbox"
               checked={agreed}
@@ -171,9 +172,9 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
                 setAgreed(e.target.checked);
                 if (e.target.checked) setError(null);
               }}
-              className="mt-0.5 w-5 h-5 shrink-0 rounded border-zinc-300 text-pink-500 focus:ring-pink-500/40 cursor-pointer"
+              className="mt-1 h-9 w-9 shrink-0 cursor-pointer rounded-md border-zinc-300 text-pink-500 focus:ring-pink-500/40"
             />
-            <span className="text-xs font-bold text-zinc-800 leading-snug">
+            <span className="text-lg font-bold leading-snug text-zinc-800">
               개인정보 수집·이용에 동의합니다.
             </span>
           </label>
@@ -184,7 +185,7 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
           type="button"
           onClick={() => handleSubmit()}
           disabled={digits.length < 10 || !agreed || loading}
-          className={`w-full py-4.5 rounded-2xl font-bold text-lg shadow-lg touch-press transition-all duration-300 flex items-center justify-center gap-2 ${
+          className={`flex w-full items-center justify-center gap-3 rounded-3xl py-7 text-2xl font-bold shadow-lg touch-press transition-all duration-300 ${
             digits.length >= 10 && agreed && !loading
               ? 'bg-gradient-to-r from-pink-500 to-indigo-600 text-white cursor-pointer active:shadow-indigo-500/20 active:brightness-110 shadow-indigo-500/10'
               : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-zinc-300/30 shadow-none'
@@ -192,16 +193,17 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
         >
           {loading ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="h-9 w-9 animate-spin" />
               <span>확인 중...</span>
             </>
           ) : (
             <>
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="h-9 w-9" />
               <span>이벤트 참여하기</span>
             </>
           )}
         </button>
+      </div>
       </div>
     </div>
   );

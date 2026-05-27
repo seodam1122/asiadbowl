@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { Prize } from '@/lib/db';
 import { Sparkles, HelpCircle } from 'lucide-react';
+import GameScreenLayout from '@/components/GameScreenLayout';
 
 // Helper function to split prize name into maximum 2 lines for wrapping
 const splitPrizeName = (name: string): string[] => {
@@ -121,22 +122,29 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
   const sectorAngle = 360 / sectorCount;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-between p-6">
-      {/* Title */}
-      <div className="text-center pt-4 select-none">
-        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-600">
-          LUCKY WHEEL
-        </span>
-        <h2 className="text-2xl font-black tracking-tight text-zinc-800 mt-2">
-          행운의 룰렛 돌리기
-        </h2>
-        <p className="text-xs text-zinc-500 mt-1.5 font-medium">
-          화면 중앙의 START 버튼을 터치하여<br />경품 룰렛을 돌려보세요!
-        </p>
-      </div>
-
-      {/* Wheel Area */}
-      <div className="relative w-full aspect-square max-w-[340px] flex items-center justify-center my-4">
+    <GameScreenLayout
+      sectionGap="gap-14"
+      contentGap="gap-10"
+      badge="LUCKY WHEEL"
+      title="행운의 룰렛 돌리기"
+      subtitle={
+        <>
+          화면 중앙의 START 버튼을 터치하여
+          <br />
+          경품 룰렛을 돌려보세요!
+        </>
+      }
+      footer={
+        <div className="flex items-center gap-4 rounded-2xl border border-indigo-100/80 bg-indigo-50/50 p-6">
+          <HelpCircle className="h-9 w-9 shrink-0 text-indigo-500" />
+          <p className="text-lg font-medium leading-normal text-indigo-900/80">
+            100% 당첨 보장! 룰렛 결과에 따라 푸짐한 상품이 즉시 지급됩니다. 룰렛이 완전히 정지할 때까지
+            터치스크린을 조작하지 마세요.
+          </p>
+        </div>
+      }
+    >
+      <div className="relative mx-auto my-4 flex aspect-square w-full max-w-[min(100%,40rem)] items-center justify-center">
         {/* Outer Glowing Border */}
         <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-pink-500 to-indigo-500 opacity-10 blur-xl pointer-events-none" />
         <div className="absolute inset-[-4px] rounded-full border border-zinc-200 pointer-events-none shadow-sm" />
@@ -216,7 +224,7 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
                       <text
                         x="200"
                         fill="#ffffff"
-                        fontSize="15.5"
+                        fontSize="22"
                         fontWeight="bold"
                         textAnchor="middle"
                         transform={`rotate(180 200 65)`}
@@ -230,7 +238,7 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
                         x="200"
                         y="67"
                         fill="#ffffff"
-                        fontSize="17.5"
+                        fontSize="25"
                         fontWeight="bold"
                         textAnchor="middle"
                         transform={`rotate(180 200 67)`}
@@ -271,31 +279,23 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
         </svg>
 
         {/* Pointer arrow (Static, at 12 o'clock pointing down) */}
-        <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 z-10 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[22px] border-t-pink-500 drop-shadow-[0_4px_8px_rgba(236,72,153,0.5)]" />
+        <div className="absolute top-[-14px] left-1/2 z-10 h-0 w-0 -translate-x-1/2 border-l-[22px] border-l-transparent border-r-[22px] border-r-transparent border-t-[34px] border-t-pink-500 drop-shadow-[0_4px_8px_rgba(236,72,153,0.5)]" />
 
         {/* Center START Button */}
         <button
           type="button"
           onClick={startSpin}
           disabled={isSpinning}
-          className={`absolute w-20 h-20 rounded-full flex flex-col items-center justify-center z-20 touch-press transition-all duration-300 font-bold tracking-wider text-sm select-none border-2 ${
+          className={`absolute z-20 flex h-36 w-36 touch-press select-none flex-col items-center justify-center rounded-full border-2 font-bold tracking-wider transition-all duration-300 ${
             isSpinning
-              ? 'bg-zinc-800 text-zinc-500 border-zinc-700 shadow-none'
-              : 'bg-gradient-to-tr from-pink-500 to-indigo-600 text-white border-pink-400/30 shadow-[0_0_20px_rgba(236,72,153,0.4)] hover:shadow-[0_0_30px_rgba(236,72,153,0.6)] animate-pulse-glow'
+              ? 'border-zinc-700 bg-zinc-800 text-zinc-500 shadow-none'
+              : 'animate-pulse-glow border-pink-400/30 bg-gradient-to-tr from-pink-500 to-indigo-600 text-white shadow-[0_0_20px_rgba(236,72,153,0.4)] hover:shadow-[0_0_30px_rgba(236,72,153,0.6)]'
           }`}
         >
-          <Sparkles className={`w-4 h-4 mb-0.5 ${isSpinning ? 'text-zinc-500' : 'text-pink-200'}`} />
-          <span className="text-[13px]">START</span>
+          <Sparkles className={`mb-1 h-8 w-8 ${isSpinning ? 'text-zinc-500' : 'text-pink-200'}`} />
+          <span className="text-2xl">START</span>
         </button>
       </div>
-
-      {/* Info Banner */}
-      <div className="w-full bg-indigo-50/50 border border-indigo-100/80 rounded-2xl p-4 flex gap-3 items-center mb-2">
-        <HelpCircle className="w-5 h-5 text-indigo-500 shrink-0" />
-        <p className="text-xs text-indigo-900/80 leading-normal font-medium">
-          100% 당첨 보장! 룰렛 결과에 따라 푸짐한 상품이 즉시 지급됩니다. 룰렛이 완전히 정지할 때까지 터치스크린을 조작하지 마세요.
-        </p>
-      </div>
-    </div>
+    </GameScreenLayout>
   );
 }

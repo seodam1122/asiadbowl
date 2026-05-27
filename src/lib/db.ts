@@ -182,22 +182,39 @@ function storageObjectPath(storageKey: string): string {
   return storageKey;
 }
 
-/** Supabase Storage 업로드(설정 시) 또는 로컬 IndexedDB 저장 */
+/** Supabase Storage 업로드 — 실패 시 data URL 로컬 저장으로 넘어가지 않음 */
 async function resolveImageForPersistence(
   storageKey: string,
   imageUrl: string
 ): Promise<string> {
   const needsUpload = isDataUrl(imageUrl) || isLocalMediaRef(imageUrl);
 
-  if (isSupabaseConfigured && supabase && needsUpload) {
-    return persistImageToServer(storageObjectPath(storageKey), imageUrl);
+  if (!needsUpload) {
+    return imageUrl;
   }
 
-  if (isDataUrl(imageUrl)) {
-    return externalizeImageUrl(storageKey, imageUrl);
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error(
+      'Supabase가 연결되지 않았습니다.\n' +
+        '프로젝트 루트에 .env.local 파일을 만들고 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 넣은 뒤 개발 서버(npm run dev)를 다시 시작하세요.'
+    );
   }
 
-  return imageUrl;
+  return persistImageToServer(storageObjectPath(storageKey), imageUrl);
+}
+
+function assertKioskStorageUrl(url: string, label: string): string {
+  if (isDataUrl(url) || isLocalMediaRef(url)) {
+    throw new Error(
+      `${label} 이미지가 서버 Storage에 올라가지 않았습니다. Supabase 설정과 storage.sql 실행을 확인하세요.`
+    );
+  }
+  if (isSupabaseConfigured && !isKioskStoragePublicUrl(url)) {
+    throw new Error(
+      `${label} 이미지 URL이 Storage 형식이 아닙니다. 파일을 다시 업로드해 주세요.`
+    );
+  }
+  return url;
 }
 
 function assertPrizeImagesPersistedToServer(prizes: Prize[]): void {
@@ -339,7 +356,18 @@ export const db = {
       }
     }
 
-    return hydrateSettings(persisted);
+    return {
+      ...persisted,
+      ad_image_url: isLocalMediaRef(persisted.ad_image_url)
+        ? await hydrateImageUrl(persisted.ad_image_url)
+        : persisted.ad_image_url,
+    };
+  },
+
+  /** 광고 배너 즉시 Storage 업로드 */
+  async uploadAdImage(imageUrl: string): Promise<string> {
+    const url = await resolveImageForPersistence('settings-ad', imageUrl);
+    return assertKioskStorageUrl(url, '광고');
   },
 
   // Prizes API
@@ -369,22 +397,14 @@ export const db = {
     return prizes.find((p) => p.id === id) ?? null;
   },
 
-  /** 경품 이미지만 즉시 Storage 업로드 (관리자에서 파일 선택 직후) */
+  /** 경품 이미지 즉시 Storage 업로드 */
   async uploadPrizeImage(prizeId: number, imageUrl: string): Promise<string> {
     const id = Number(prizeId);
     if (!id || Number.isNaN(id)) {
       throw new Error('경품 ID가 올바르지 않습니다.');
     }
     const url = await resolveImageForPersistence(`prizes/prize-${id}`, imageUrl);
-    if (isDataUrl(url) || isLocalMediaRef(url)) {
-      throw new Error('이미지가 서버 Storage에 올라가지 않았습니다. Supabase 설정을 확인하세요.');
-    }
-    if (isSupabaseConfigured && !isKioskStoragePublicUrl(url)) {
-      throw new Error(
-        '업로드된 주소가 Supabase Storage URL이 아닙니다. 파일을 다시 업로드하거나 .env.local을 확인하세요.'
-      );
-    }
-    return url;
+    return assertKioskStorageUrl(url, '경품');
   },
 
   async savePrizeList(prizesList: Prize[]): Promise<Prize[]> {

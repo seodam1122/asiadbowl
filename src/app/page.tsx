@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import KioskContainer from '@/components/KioskContainer';
+import KioskPortraitImage from '@/components/KioskPortraitImage';
 import PhoneNumberInput from '@/components/PhoneNumberInput';
 import RouletteGame from '@/components/RouletteGame';
 import ScratchCardGame from '@/components/ScratchCardGame';
@@ -225,41 +226,38 @@ export default function UserKioskPage() {
     <KioskContainer>
       {/* 1. Landing Screen */}
       {step === 'landing' && (
-        <div className="flex-1 flex flex-col justify-between relative overflow-hidden select-none bg-zinc-950">
+        <div className="relative flex min-h-0 flex-1 flex-col justify-between overflow-hidden bg-zinc-950 select-none">
           {/* Full Screen Ad Background Image */}
-          <div className="absolute inset-0 w-full h-full z-0 bg-zinc-950">
-            <img
-              src={adImageUrl}
-              alt="Promotion banner"
-              className="w-full h-full object-cover"
-            />
-          </div>
+          <KioskPortraitImage src={adImageUrl} alt="Promotion banner" />
 
           {/* Ad text block and button overlayed on top */}
-          <div className="relative z-10 flex-1 flex flex-col justify-between px-6 pb-12 pt-12">
-            {/* Glassmorphic floating ad card */}
-            <div className="bg-black/35 backdrop-blur-md border border-white/10 rounded-3xl p-6 text-center space-y-3 shadow-[0_10px_35px_rgba(0,0,0,0.3)]">
-              <h1 className="text-2xl font-black tracking-tight text-white leading-tight">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col px-6 pb-8 pt-16">
+            {/* Glassmorphic floating ad card — 아래로 살짝 */}
+            <div className="mt-10 space-y-5 rounded-3xl border border-white/10 bg-black/40 p-10 text-center shadow-[0_10px_35px_rgba(0,0,0,0.35)] backdrop-blur-md">
+              <h1 className="text-5xl font-black leading-tight tracking-tight text-white sm:text-6xl">
                 {adTitle}
               </h1>
-              <p className="text-sm text-zinc-100 font-semibold whitespace-pre-line leading-relaxed">
+              <p className="text-2xl font-semibold leading-relaxed whitespace-pre-line text-zinc-50 sm:text-3xl">
                 {adSubtitle}
               </p>
             </div>
 
             {/* Glowing Touch to Start Button */}
-            <div className="w-full">
+            <div className="mt-auto mb-24 w-full">
               <button
                 type="button"
                 onClick={handleStart}
-                className="w-full py-5.5 rounded-3xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white font-extrabold text-xl shadow-[0_0_30px_rgba(236,72,153,0.35)] animate-pulse-glow shine-effect touch-press flex items-center justify-center gap-3 border border-pink-400/20"
+                className="shine-effect touch-press animate-pulse-glow flex w-full items-center justify-center gap-6 rounded-[2rem] border-2 border-pink-300/30 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 py-12 text-5xl font-extrabold text-white shadow-[0_0_50px_rgba(236,72,153,0.5)]"
               >
                 <span>터치하여 시작하기</span>
-                <ArrowRight className="w-6 h-6 animate-pulse" />
+                <ArrowRight className="h-16 w-16 shrink-0 animate-pulse" />
               </button>
-              <p 
-                className="text-[10px] text-zinc-300 text-center mt-3 tracking-wide"
-                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+              <p
+                className="mt-5 text-center text-lg font-bold leading-snug tracking-wide text-amber-200"
+                style={{
+                  textShadow:
+                    '0 0 12px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1)',
+                }}
               >
                 * 본 이벤트는 1인 1일 1회만 참여 가능합니다.
               </p>
@@ -270,14 +268,15 @@ export default function UserKioskPage() {
 
       {/* 2. Authentication Screen */}
       {step === 'auth' && (
-        <div className="flex-1 flex flex-col bg-white select-none">
+        <div className="flex min-h-0 flex-1 flex-col bg-white select-none">
           {/* Header navigation */}
-          <div className="px-6 py-4 flex items-center border-b border-zinc-200 bg-white justify-between shrink-0">
+          <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-6 py-4">
             <button
+              type="button"
               onClick={handleResetKiosk}
-              className="text-sm text-zinc-600 font-bold hover:text-zinc-900 transition-colors flex items-center gap-1"
+              className="touch-press flex items-center gap-2 text-lg font-bold text-zinc-600 transition-colors hover:text-zinc-900"
             >
-              <ChevronLeft className="w-5 h-5 text-zinc-500" />
+              <ChevronLeft className="h-8 w-8 text-zinc-500" />
               <span>처음으로</span>
             </button>
           </div>
@@ -288,48 +287,61 @@ export default function UserKioskPage() {
 
       {/* 2.5 Game Selection Screen */}
       {step === 'select_game' && (
-        <div className="flex-1 flex flex-col justify-between p-6 bg-white select-none animate-fade-in">
-          <div className="text-center pt-6">
-            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-600">
-              GAME SELECT
-            </span>
-            <h2 className="text-2xl font-black tracking-tight text-zinc-800 mt-2">
-              게임 선택하기
-            </h2>
-            <p className="text-xs text-zinc-500 mt-1.5 font-medium">
-              도전하고 싶은 미니 게임을 하나 선택해 주세요!
-            </p>
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white select-none animate-fade-in">
+          <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-12 px-6 py-6 -translate-y-4">
+            <div className="w-full text-center">
+              <span className="inline-block rounded-full border border-pink-500/20 bg-pink-500/10 px-6 py-2 text-base font-semibold text-pink-600">
+                GAME SELECT
+              </span>
+              <h2 className="mt-4 text-6xl font-black tracking-tight text-zinc-800">
+                게임 선택하기
+              </h2>
+              <p className="mt-3 text-2xl font-medium text-zinc-500">
+                도전하고 싶은 미니 게임을 하나 선택해 주세요!
+              </p>
+            </div>
 
-          <div className="grid grid-cols-2 gap-5 my-auto">
-            {[
-              { id: 'roulette', emoji: '🎡', name: '행운의 룰렛', desc: '돌려서 100% 당첨' },
-              { id: 'scratch', emoji: '🎫', name: '스크래치 복권', desc: '슥슥 긁어서 확인' },
-              { id: 'spot_diff', emoji: '🔍', name: '틀린그림찾기', desc: '서로 다른 3곳 찾기' },
-              { id: 'hidden_obj', emoji: '🎨', name: '숨은그림찾기', desc: '그림 속 물건 찾기' }
-            ].map((game) => (
-              <button
-                key={game.id}
-                type="button"
-                onClick={() => {
-                  setSelectedGame(game.id);
-                  setStep('game');
-                }}
-                className="py-9 px-4 rounded-3xl border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-pink-500/30 text-center transition-all duration-300 touch-press flex flex-col items-center justify-center gap-3 shadow-[0_4px_15px_rgba(0,0,0,0.05)]"
-              >
-                <span className="text-4xl filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] animate-float" style={{ animationDelay: `${game.id === 'roulette' ? '0s' : game.id === 'scratch' ? '0.5s' : game.id === 'spot_diff' ? '1s' : '1.5s'}` }}>
-                  {game.emoji}
-                </span>
-                <span className="font-black text-base text-zinc-800 tracking-tight">{game.name}</span>
-                <span className="text-[10px] text-zinc-500 font-medium leading-relaxed px-1">{game.desc}</span>
-              </button>
-            ))}
-          </div>
+            <div className="grid w-full grid-cols-2 gap-6">
+              {[
+                { id: 'roulette', emoji: '🎡', name: '행운의 룰렛', desc: '돌려서 100% 당첨' },
+                { id: 'scratch', emoji: '🎫', name: '스크래치 복권', desc: '슥슥 긁어서 확인' },
+                { id: 'spot_diff', emoji: '🔍', name: '틀린그림찾기', desc: '서로 다른 3곳 찾기' },
+                { id: 'hidden_obj', emoji: '🎨', name: '숨은그림찾기', desc: '그림 속 물건 찾기' },
+              ].map((game) => (
+                <button
+                  key={game.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedGame(game.id);
+                    setStep('game');
+                  }}
+                  className="touch-press flex flex-col items-center justify-center gap-6 rounded-3xl border border-zinc-200 bg-white px-5 py-14 text-center shadow-[0_4px_15px_rgba(0,0,0,0.06)] transition-all duration-300 hover:border-pink-500/30 hover:bg-zinc-50"
+                >
+                  <span
+                    className="animate-float text-8xl filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)]"
+                    style={{
+                      animationDelay:
+                        game.id === 'roulette'
+                          ? '0s'
+                          : game.id === 'scratch'
+                            ? '0.5s'
+                            : game.id === 'spot_diff'
+                              ? '1s'
+                              : '1.5s',
+                    }}
+                  >
+                    {game.emoji}
+                  </span>
+                  <span className="text-3xl font-black tracking-tight text-zinc-800">{game.name}</span>
+                  <span className="px-1 text-lg font-medium leading-relaxed text-zinc-500">{game.desc}</span>
+                </button>
+              ))}
+            </div>
 
-          <div className="pb-4">
             <button
+              type="button"
               onClick={handleResetKiosk}
-              className="w-full py-4 rounded-xl border border-zinc-200 bg-white text-zinc-500 hover:text-zinc-800 font-bold text-xs touch-press transition-colors shadow-sm"
+              className="w-full touch-press rounded-2xl border border-zinc-200 bg-white py-7 text-2xl font-bold text-zinc-500 shadow-sm transition-colors hover:text-zinc-800"
             >
               처음으로 돌아가기
             </button>
@@ -339,8 +351,7 @@ export default function UserKioskPage() {
 
       {/* 3. Game Screen */}
       {step === 'game' && (
-        <div className="flex-1 flex flex-col bg-white select-none">
-
+        <div className="flex min-h-0 flex-1 w-full flex-col bg-white select-none">
 
           {selectedGame === 'roulette' && (
             <RouletteGame key={gameSession} prizes={prizes} onFinished={handleGameFinished} />
@@ -362,101 +373,100 @@ export default function UserKioskPage() {
 
       {/* 4. Result Modal Cover overlay */}
       {step === 'result' && wonPrize && (
-        <div className="absolute inset-0 z-50 bg-white flex flex-col justify-between p-6 select-none animate-fade-in">
-          {/* Top banner */}
-          <div className="text-center pt-10">
-            <div className="inline-flex p-4 bg-gradient-to-tr from-pink-500/10 to-indigo-500/10 rounded-full border border-pink-500/20 mb-6 animate-bounce">
-              <Gift className="w-10 h-10 text-pink-500" />
-            </div>
-            
-            <h2 className="text-3xl font-black tracking-tight text-zinc-800">
-              {!wonPrize.name.includes('꽝') && !wonPrize.name.includes('다음 기회에')
-                ? '축하합니다!'
-                : '아쉽게도...'}
-            </h2>
-            <p className="text-zinc-500 text-sm mt-2 font-medium">
-              {!wonPrize.name.includes('꽝') && !wonPrize.name.includes('다음 기회에')
-                ? '경품 당첨 결과를 확인하세요!'
-                : '다음 기회에 도전해주세요!'}
-            </p>
-          </div>
+        <div className="absolute inset-0 z-50 flex animate-fade-in flex-col overflow-y-auto bg-white select-none">
+          <div className="mx-auto flex w-full max-w-[min(100%,52rem)] flex-1 flex-col items-center justify-center gap-12 px-6 py-6 -translate-y-2">
+            {/* Top banner */}
+            <div className="w-full text-center">
+              <div className="mb-8 inline-flex animate-bounce rounded-full border border-pink-500/20 bg-gradient-to-tr from-pink-500/10 to-indigo-500/10 p-8">
+                <Gift className="h-20 w-20 text-pink-500" />
+              </div>
 
-          {/* Prize Box */}
-          <div className="my-4 bg-zinc-50/80 border border-zinc-200/80 rounded-3xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-lg">
-            {/* Glow backing */}
-            <div className="absolute -inset-10 bg-radial-gradient(ellipse_at_center,#fbcfe8,transparent_60%) pointer-events-none opacity-20" />
-            
-            {/* Prize Image */}
-            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-100 p-1 mb-5 bg-white shadow-md animate-float">
-              <img
-                src={wonPrize.image_url}
-                alt={wonPrize.name}
-                className="w-full h-full object-cover rounded-full"
-              />
-            </div>
-
-            <div className="space-y-1 z-10">
-              <span className="text-xs font-mono tracking-widest text-indigo-600 font-bold uppercase">
+              <h2 className="text-7xl font-black tracking-tight text-zinc-800">
                 {!wonPrize.name.includes('꽝') && !wonPrize.name.includes('다음 기회에')
-                  ? 'WINNING PRIZE'
-                  : 'TRY AGAIN'}
-              </span>
-              <h3 className="text-2xl font-extrabold text-transparent bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text">
-                {wonPrize.name}
-              </h3>
-              {generatedCoupon && (
-                <div className="mt-4 px-5 py-2.5 bg-pink-500/10 border border-pink-500/20 rounded-2xl inline-flex flex-col items-center justify-center animate-pulse">
-                  <span className="text-[10px] font-bold text-pink-600 uppercase tracking-widest">쿠폰 번호</span>
-                  <span className="text-lg font-mono font-black text-pink-700 tracking-wider mt-0.5">{generatedCoupon}</span>
-                </div>
-              )}
-              {alimtalkNotice && (
-                <p className="mt-3 text-xs font-semibold text-indigo-600 leading-relaxed max-w-xs mx-auto">
-                  {alimtalkNotice}
-                </p>
-              )}
+                  ? '축하합니다!'
+                  : '아쉽게도...'}
+              </h2>
+              <p className="mt-4 text-2xl font-medium text-zinc-500">
+                {!wonPrize.name.includes('꽝') && !wonPrize.name.includes('다음 기회에')
+                  ? '경품 당첨 결과를 확인하세요!'
+                  : '다음 기회에 도전해주세요!'}
+              </p>
             </div>
-          </div>
 
-          {/* Coupon download QR */}
-          {isWinningPrize(wonPrize) && generatedCoupon && (
-            <div className="px-2 pb-2">
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 flex flex-col items-center shadow-sm">
-                <p className="text-xs font-bold text-zinc-700 mb-1">
-                  휴대폰으로 QR 스캔
-                </p>
-                <p className="text-[10px] text-zinc-500 mb-3 text-center leading-relaxed">
-                  스캔하면 쿠폰 번호가 적힌 이미지를 저장할 수 있습니다
-                </p>
-                {couponQrDataUrl ? (
-                  <img
-                    src={couponQrDataUrl}
-                    alt="쿠폰 이미지 다운로드 QR"
-                    className="w-44 h-44 rounded-xl border border-zinc-100"
-                  />
-                ) : (
-                  <div className="w-44 h-44 rounded-xl bg-zinc-100 animate-pulse flex items-center justify-center text-[10px] text-zinc-400 font-medium">
-                    QR 생성 중…
+            {/* Prize Box */}
+            <div className="relative flex w-full flex-col items-center justify-center overflow-hidden rounded-3xl border border-zinc-200/80 bg-zinc-50/80 p-16 text-center shadow-lg">
+              <div className="pointer-events-none absolute -inset-10 bg-radial-gradient(ellipse_at_center,#fbcfe8,transparent_60%) opacity-20" />
+
+              <div className="mb-10 h-72 w-72 animate-float overflow-hidden rounded-2xl border-[6px] border-indigo-100 bg-white p-2 shadow-md">
+                <img
+                  src={wonPrize.image_url}
+                  alt={wonPrize.name}
+                  className="h-full w-full rounded-xl object-cover"
+                />
+              </div>
+
+              <div className="z-10 space-y-3">
+                <span className="text-xl font-mono font-bold uppercase tracking-widest text-indigo-600">
+                  {!wonPrize.name.includes('꽝') && !wonPrize.name.includes('다음 기회에')
+                    ? 'WINNING PRIZE'
+                    : 'TRY AGAIN'}
+                </span>
+                <h3 className="bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-6xl font-extrabold leading-tight text-transparent">
+                  {wonPrize.name}
+                </h3>
+                {generatedCoupon && (
+                  <div className="mt-8 inline-flex animate-pulse flex-col items-center justify-center rounded-2xl border border-pink-500/20 bg-pink-500/10 px-10 py-6">
+                    <span className="text-lg font-bold uppercase tracking-widest text-pink-600">쿠폰 번호</span>
+                    <span className="mt-2 font-mono text-4xl font-black tracking-wider text-pink-700">
+                      {generatedCoupon}
+                    </span>
                   </div>
+                )}
+                {alimtalkNotice && (
+                  <p className="mx-auto mt-6 max-w-xl text-2xl font-semibold leading-relaxed text-indigo-600">
+                    {alimtalkNotice}
+                  </p>
                 )}
               </div>
             </div>
-          )}
 
-          {/* Action section and self-reset timer */}
-          <div className="space-y-4 pb-6">
-            <button
-              type="button"
-              onClick={handleResetKiosk}
-              className="w-full py-4.5 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-600 text-white font-extrabold text-lg shadow-lg touch-press transition-colors"
-            >
-              확인 (처음으로)
-            </button>
-            
-            {/* Timer visual count */}
-            <div className="flex items-center justify-center gap-1.5 text-zinc-500 text-xs font-mono">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '8s' }} />
-              <span>{resetTimer}초 후에 자동으로 메인 화면으로 돌아갑니다.</span>
+            {/* Coupon download QR — 이미지 크기(w-44) 유지 */}
+            {isWinningPrize(wonPrize) && generatedCoupon && (
+              <div className="w-full px-2">
+                <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                  <p className="mb-1 text-2xl font-bold text-zinc-700">휴대폰으로 QR 스캔</p>
+                  <p className="mb-3 text-center text-xl leading-relaxed text-zinc-500">
+                    스캔하면 쿠폰 번호가 적힌 이미지를 저장할 수 있습니다
+                  </p>
+                  {couponQrDataUrl ? (
+                    <img
+                      src={couponQrDataUrl}
+                      alt="쿠폰 이미지 다운로드 QR"
+                      className="h-44 w-44 rounded-xl border border-zinc-100"
+                    />
+                  ) : (
+                    <div className="flex h-44 w-44 items-center justify-center rounded-xl bg-zinc-100 text-sm font-medium text-zinc-400 animate-pulse">
+                      QR 생성 중…
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Action section and self-reset timer */}
+            <div className="w-full space-y-6 pb-4">
+              <button
+                type="button"
+                onClick={handleResetKiosk}
+                className="touch-press w-full rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-600 py-10 text-4xl font-extrabold text-white shadow-lg transition-colors"
+              >
+                확인 (처음으로)
+              </button>
+
+              <div className="flex items-center justify-center gap-2.5 font-mono text-2xl text-zinc-500">
+                <RefreshCw className="h-7 w-7 animate-spin" style={{ animationDuration: '8s' }} />
+                <span>{resetTimer}초 후에 자동으로 메인 화면으로 돌아갑니다.</span>
+              </div>
             </div>
           </div>
         </div>

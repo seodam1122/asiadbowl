@@ -10,7 +10,12 @@ import {
   normalizePhoneNumber,
 } from '@/lib/db';
 import { fileToCompressedDataUrl } from '@/lib/image-utils';
-import { isKioskStoragePublicUrl, stripUrlCacheBust } from '@/lib/kiosk-storage-url';
+import {
+  isEmbeddedImageData,
+  isKioskStoragePublicUrl,
+  stripUrlCacheBust,
+} from '@/lib/kiosk-storage-url';
+import { getSupabaseConnectionHint, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   Lock, KeyRound, ShieldAlert, Users, Image as ImageIcon, 
   Settings as SettingsIcon, Download, Save, CheckCircle2, 
@@ -448,12 +453,7 @@ export default function AdminPage() {
     }
   };
 
-  const readImageFileAsDataUrl = async (
-    file: File,
-    onSuccess: (dataUrl: string) => void,
-    successMessage: string,
-    maxDimension: number
-  ) => {
+  const processImageFile = async (file: File) => {
     if (file.size > 2.5 * 1024 * 1024) {
       const errorMsg = `이미지 파일 크기는 최대 2.5MB까지만 허용됩니다.\n(선택하신 파일 크기: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`;
       alert(errorMsg);
@@ -461,24 +461,23 @@ export default function AdminPage() {
       return;
     }
 
+    setSaveStatus({ type: null, message: '' });
     try {
-      const dataUrl = await fileToCompressedDataUrl(file, maxDimension, 0.82);
-      onSuccess(dataUrl);
-      setSaveStatus({ type: 'success', message: successMessage });
-    } catch {
-      const errorMsg = '이미지 파일을 로드하여 읽는 중 예기치 못한 에러가 발생했습니다. 다시 시도해 주세요.';
-      alert(errorMsg);
-      setSaveStatus({ type: 'error', message: errorMsg });
+      const dataUrl = await fileToCompressedDataUrl(file, 1280, 0.82);
+      const serverUrl = await db.uploadAdImage(dataUrl);
+      setAdImageUrl(serverUrl);
+      setSaveStatus({
+        type: 'success',
+        message:
+          '광고 배너가 Supabase Storage에 업로드되었습니다. 저장 버튼으로 제목·부제목을 함께 저장하세요.',
+      });
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : '광고 이미지 서버 업로드에 실패했습니다.';
+      setSaveStatus({ type: 'error', message });
+      alert(message);
     }
-  };
-
-  const processImageFile = (file: File) => {
-    void readImageFileAsDataUrl(
-      file,
-      setAdImageUrl,
-      '이미지 파일이 정상적으로 불러와졌습니다. 하단의 저장 버튼을 누르면 최종 적용됩니다.',
-      1280
-    );
   };
 
   const processPrizeImageFile = async (file: File, prizeIndex: number) => {
@@ -516,7 +515,7 @@ export default function AdminPage() {
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      processImageFile(file);
+      void processImageFile(file);
     }
   };
 
@@ -539,7 +538,7 @@ export default function AdminPage() {
         alert('이미지 파일만 업로드할 수 있습니다.');
         return;
       }
-      processImageFile(file);
+      void processImageFile(file);
     }
   };
 
@@ -1281,6 +1280,13 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-xl font-black text-zinc-850">광고 콘텐츠 관리</h2>
                 <p className="text-xs text-zinc-500 mt-1 font-medium">키오스크 첫 화면(랜딩 페이지)에 표시될 광고와 카피 문구를 설정합니다.</p>
+                <p
+                  className={`text-[10px] mt-2 font-semibold ${
+                    isSupabaseConfigured ? 'text-emerald-600' : 'text-amber-700'
+                  }`}
+                >
+                  {getSupabaseConnectionHint()}
+                </p>
               </div>
 
               <form onSubmit={handleSaveAds} className="space-y-5">
@@ -1326,13 +1332,13 @@ export default function AdminPage() {
                         }`}
                       >
                         <div className="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none select-none">
-                          {adImageUrl && adImageUrl.startsWith('data:image') ? (
+                          {adImageUrl && isKioskStoragePublicUrl(adImageUrl) ? (
                             <>
                               <span className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 mb-2.5 shadow-sm">
                                 <CheckCircle2 className="w-5 h-5" />
                               </span>
-                              <p className="text-[11px] text-emerald-600 font-bold">새로운 이미지 파일 선택됨</p>
-                              <p className="text-[9px] text-zinc-500 mt-1">하단의 저장 버튼을 누르면 적용됩니다</p>
+                              <p className="text-[11px] text-emerald-600 font-bold">서버에 업로드됨</p>
+                              <p className="text-[9px] text-zinc-500 mt-1">저장 버튼으로 제목·부제목을 함께 저장하세요</p>
                             </>
                           ) : (
                             <>
@@ -1360,14 +1366,27 @@ export default function AdminPage() {
                   {/* Manual URL input fallback */}
                   <div className="space-y-1.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">또는 이미지 직접 URL 입력</span>
-                    <input
-                      type="text"
-                      value={adImageUrl}
-                      onChange={(e) => setAdImageUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/... 또는 base64 주소"
-                      className="w-full px-4 py-3 bg-white border border-zinc-200 focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 rounded-xl text-xs text-zinc-800 outline-none transition-all"
-                      required
-                    />
+                    {isEmbeddedImageData(adImageUrl) ? (
+                      <p className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
+                        브라우저 임시 이미지입니다. 위에서 파일을 업로드하면 Supabase Storage URL이 생성됩니다.
+                      </p>
+                    ) : isKioskStoragePublicUrl(adImageUrl) ? (
+                      <div className="space-y-1">
+                        <p className="text-[9px] text-emerald-600 font-bold">Supabase Storage URL (서버 저장됨)</p>
+                        <p className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-xl text-[10px] text-zinc-700 font-mono break-all leading-relaxed">
+                          {stripUrlCacheBust(adImageUrl)}
+                        </p>
+                      </div>
+                    ) : (
+                      <input
+                        type="url"
+                        value={adImageUrl}
+                        onChange={(e) => setAdImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full px-4 py-3 bg-white border border-zinc-200 focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 rounded-xl text-xs text-zinc-800 outline-none transition-all"
+                        required
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -1407,6 +1426,13 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-xl font-black text-zinc-850">이벤트 및 경품 설정</h2>
                 <p className="text-xs text-zinc-500 mt-1 font-medium">각 경품별 명칭, 이미지, 당첨 확률을 설정합니다.</p>
+                <p
+                  className={`text-[10px] mt-2 font-semibold ${
+                    isSupabaseConfigured ? 'text-emerald-600' : 'text-amber-700'
+                  }`}
+                >
+                  {getSupabaseConnectionHint()}
+                </p>
               </div>
 
               {/* Real-time probability validation warning bar */}
@@ -1509,13 +1535,13 @@ export default function AdminPage() {
                           }`}
                         >
                           <div className="flex flex-col items-center justify-center py-4 pointer-events-none select-none">
-                            {prize.image_url && prize.image_url.startsWith('data:image') ? (
+                            {prize.image_url && isKioskStoragePublicUrl(prize.image_url) ? (
                               <>
                                 <span className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 mb-2 shadow-sm">
                                   <CheckCircle2 className="w-4 h-4" />
                                 </span>
-                                <p className="text-[11px] text-emerald-600 font-bold">업로드된 이미지 적용 대기 중</p>
-                                <p className="text-[9px] text-zinc-500 mt-1">저장 버튼을 누르면 반영됩니다</p>
+                                <p className="text-[11px] text-emerald-600 font-bold">서버에 업로드됨</p>
+                                <p className="text-[9px] text-zinc-500 mt-1">저장 버튼으로 이름·확률을 함께 저장하세요</p>
                               </>
                             ) : (
                               <>
@@ -1532,9 +1558,9 @@ export default function AdminPage() {
                         </div>
                         <div className="space-y-1">
                           <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">또는 이미지 URL 입력</span>
-                          {prize.image_url.startsWith('data:image') ? (
+                          {isEmbeddedImageData(prize.image_url) ? (
                             <p className="w-full px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
-                              로컬 미리보기만 있습니다. 파일을 다시 업로드하면 서버 URL이 생성됩니다.
+                              브라우저 임시 이미지입니다. 파일을 다시 업로드하면 Supabase Storage URL이 생성됩니다.
                             </p>
                           ) : isKioskStoragePublicUrl(prize.image_url) ? (
                             <div className="space-y-1">
