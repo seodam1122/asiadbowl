@@ -18,3 +18,9 @@ export function readViewportSize(): { width: number; height: number } {
     height: vv?.height ?? window.innerHeight,
   };
 }
+
+/**
+다른 패널 해상도(예: 720×1280)에 맞추고 싶으면 
+src/lib/kiosk-viewport.ts의 KIOSK_DESIGN_WIDTH / KIOSK_DESIGN_HEIGHT만 바꾸면 됩니다.
+개발 서버가 켜져 있으면 새로고침 후, 다른 기기나 브라우저 개발자 도구에서 기기 모드로 바꿔 보면서 확인해 보시면 됩니다.
+ */

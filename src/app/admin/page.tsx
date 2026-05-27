@@ -82,6 +82,36 @@ const formatAlimtalkStatus = (status?: string | null): string => {
   }
 };
 
+const formatLogDatePart = (iso: string): string =>
+  new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(iso));
+
+const formatLogTimePart = (iso: string): string =>
+  new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(new Date(iso));
+
+const formatLogUsedAtShort = (iso: string): string =>
+  new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(iso));
+
+const LOG_STATUS_BADGE =
+  'inline-flex items-center justify-center rounded-md px-2.5 py-1 text-sm font-bold leading-none';
+
 // Helper function to format 8-digit numbers to XXXX-XXXX style
 const formatCouponNumbers = (numbers: string): string => {
   if (!numbers) return '';
@@ -1027,46 +1057,38 @@ export default function AdminPage() {
                           <td className="py-3 px-4 text-zinc-400">{rowNumber}</td>
                           <td className="py-3 px-4 text-zinc-800 font-bold text-sm">{log.phone_number}</td>
                           <td className="py-3 px-4">
-                            <div className="flex flex-col gap-1.5 items-start">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  consentStatus === 'agreed'
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                                    : consentStatus === 'declined'
-                                      ? 'bg-red-50 text-red-600 border border-red-200/50'
-                                      : 'bg-zinc-100 text-zinc-500 border border-zinc-200/60'
-                                }`}
-                              >
-                                {consentStatus === 'agreed'
-                                  ? '동의'
-                                  : consentStatus === 'declined'
-                                    ? '미동의'
-                                    : '미등록'}
-                              </span>
-                              {consentStatus === 'agreed' && (
+                            <div className="flex flex-col items-start">
+                              {consentStatus === 'agreed' ? (
                                 <button
                                   type="button"
                                   disabled={isUpdatingConsent}
                                   onClick={() => handleConsentChange(log.phone_number, 'declined')}
-                                  className="text-[10px] font-bold text-red-600 hover:text-red-700 underline decoration-dotted disabled:opacity-50"
+                                  className={`${LOG_STATUS_BADGE} bg-emerald-50 text-emerald-600 border border-emerald-200/50 hover:bg-emerald-100 disabled:opacity-50 cursor-pointer transition-colors`}
+                                  title="클릭 시 수신거부(미동의) 처리"
                                 >
-                                  {isUpdatingConsent ? '처리 중...' : '수신거부 처리'}
+                                  {isUpdatingConsent ? '처리 중...' : '동의'}
                                 </button>
-                              )}
-                              {consentStatus === 'declined' && (
+                              ) : consentStatus === 'declined' ? (
                                 <button
                                   type="button"
                                   disabled={isUpdatingConsent}
                                   onClick={() => handleConsentChange(log.phone_number, 'agreed')}
-                                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline decoration-dotted disabled:opacity-50"
+                                  className={`${LOG_STATUS_BADGE} bg-red-50 text-red-600 border border-red-200/50 hover:bg-red-100 disabled:opacity-50 cursor-pointer transition-colors`}
+                                  title="클릭 시 동의로 복구"
                                 >
-                                  {isUpdatingConsent ? '처리 중...' : '동의로 복구'}
+                                  {isUpdatingConsent ? '처리 중...' : '미동의'}
                                 </button>
+                              ) : (
+                                <span
+                                  className={`${LOG_STATUS_BADGE} bg-zinc-100 text-zinc-500 border border-zinc-200/60`}
+                                >
+                                  미등록
+                                </span>
                               )}
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            <span className={`${LOG_STATUS_BADGE} ${
                               log.prize_name.includes('꽝') || log.prize_name.includes('다음')
                                 ? 'bg-zinc-100 text-zinc-500 border border-zinc-200/60'
                                 : 'bg-pink-50 text-pink-600 border border-pink-200/40'
@@ -1093,19 +1115,29 @@ export default function AdminPage() {
                           </td>
                           <td className="py-3 px-4">
                             {log.coupon_code ? (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                log.is_used 
-                                  ? 'bg-red-50 text-red-650 border border-red-200/50' 
-                                  : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50 animate-pulse'
-                              }`}>
-                                {log.is_used ? '사용완료' : '미사용'}
-                              </span>
+                              <div className="flex flex-col items-start gap-0.5">
+                                <span className={`${LOG_STATUS_BADGE} ${
+                                  log.is_used
+                                    ? 'bg-red-50 text-red-650 border border-red-200/50'
+                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50 animate-pulse'
+                                }`}>
+                                  {log.is_used ? '사용완료' : '미사용'}
+                                </span>
+                                {log.is_used && log.used_at && (
+                                  <span className="text-[10px] font-normal leading-tight text-zinc-400">
+                                    {formatLogUsedAtShort(log.used_at)}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-zinc-400">-</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-zinc-500 text-[11px]">
-                            {new Date(log.created_at).toLocaleString('ko-KR')}
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col leading-tight text-zinc-500">
+                              <span className="text-sm font-medium">{formatLogDatePart(log.created_at)}</span>
+                              <span className="mt-0.5 text-xs text-zinc-400">{formatLogTimePart(log.created_at)}</span>
+                            </div>
                           </td>
                         </tr>
                         );
