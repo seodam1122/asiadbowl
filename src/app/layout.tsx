@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import DisableVercelToolbar from "@/components/DisableVercelToolbar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,7 +36,10 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="m-0 min-h-full overflow-x-hidden">{children}</body>
+      <body className="m-0 min-h-full overflow-x-hidden">
+        <DisableVercelToolbar />
+        {children}
+      </body>
     </html>
   );
 }

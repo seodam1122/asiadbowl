@@ -160,3 +160,17 @@ body {
 .roulette-transition {
   transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
 }
+
+/* Vercel Toolbar (#feedback-toolbar) — 배포 URL에 주입되는 피드백 UI 차단 */
+#feedback-toolbar,
+[data-vercel-toolbar],
+vercel-live-feedback,
+[id^="vercel-toolbar"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+}
