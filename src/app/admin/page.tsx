@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   db,
   KioskSettings,
@@ -20,10 +20,13 @@ import {
   Lock, KeyRound, ShieldAlert, Users, Image as ImageIcon, 
   Settings as SettingsIcon, Download, Save, CheckCircle2, 
   AlertTriangle, Play, HelpCircle, LogOut, Ticket, Search, Check, XCircle,
-  ChevronLeft, ChevronRight, RotateCcw, Calendar
+  ChevronLeft, ChevronRight, RotateCcw, Calendar, Gamepad2, Coins
 } from 'lucide-react';
 
-type TabType = 'logs' | 'coupons' | 'ads' | 'prizes';
+import BowlingDevGame from '@/components/admin/BowlingDevGame';
+import PointsManager from '@/components/admin/PointsManager';
+
+type TabType = 'logs' | 'coupons' | 'points' | 'ads' | 'prizes' | 'game_dev';
 
 const LOGS_PAGE_SIZE = 10;
 
@@ -148,6 +151,10 @@ export default function AdminPage() {
   
   // UI States
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error' | null, message: string }>({ type: null, message: '' });
+  const handlePointsStatus = useCallback(
+    (status: { type: 'success' | 'error'; message: string }) => setSaveStatus(status),
+    []
+  );
   const [loading, setLoading] = useState(true);
 
   // Coupons Tab State - stores ONLY 8-digit number string
@@ -304,11 +311,14 @@ export default function AdminPage() {
     setCouponSuccess(null);
     
     try {
-      const updatedLog = await db.useCoupon(searchedCouponLog.coupon_code);
-      setSearchedCouponLog(updatedLog);
-      setCouponSuccess(`쿠폰 사용 처리가 완료되었습니다.\n(상품: ${updatedLog.prize_name} / 연락처: ${updatedLog.phone_number})`);
-      
-      // Refresh overall event logs in background to update table
+      const result = await db.useCoupon(searchedCouponLog.coupon_code);
+      setSearchedCouponLog(result.log);
+      let successMsg = `쿠폰 사용 처리가 완료되었습니다.\n(상품: ${result.log.prize_name} / 연락처: ${result.log.phone_number})`;
+      if (result.pointsEarned > 0) {
+        successMsg += `\n포인트 ${result.pointsEarned.toLocaleString()}P 적립 (잔액 ${result.balanceAfter.toLocaleString()}P)`;
+      }
+      setCouponSuccess(successMsg);
+
       Promise.all([db.getEventLogs(), db.getContactConsentsMap()]).then(([fetchedLogs, fetchedConsents]) => {
         setLogs(fetchedLogs);
         setConsentMap(fetchedConsents);
@@ -787,6 +797,18 @@ export default function AdminPage() {
           </button>
 
           <button
+            onClick={() => { setActiveTab('points'); setSaveStatus({ type: null, message: '' }); }}
+            className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
+              activeTab === 'points'
+                ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
+                : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
+            }`}
+          >
+            <Coins className="w-5 h-5 shrink-0" />
+            <span className="hidden sm:inline">포인트 관리</span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab('ads'); setSaveStatus({ type: null, message: '' }); }}
             className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
               activeTab === 'ads'
@@ -808,6 +830,18 @@ export default function AdminPage() {
           >
             <SettingsIcon className="w-5 h-5 shrink-0" />
             <span className="hidden sm:inline">이벤트 및 경품 설정</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('game_dev'); setSaveStatus({ type: null, message: '' }); }}
+            className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
+              activeTab === 'game_dev'
+                ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
+                : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
+            }`}
+          >
+            <Gamepad2 className="w-5 h-5 shrink-0" />
+            <span className="hidden sm:inline">게임 개발</span>
           </button>
         </aside>
 
@@ -1180,6 +1214,12 @@ export default function AdminPage() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'points' && (
+            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 md:p-8 shadow-sm">
+              <PointsManager onStatus={handlePointsStatus} />
             </div>
           )}
 
@@ -1634,6 +1674,19 @@ export default function AdminPage() {
                   <span>이벤트 및 경품 저장</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: Game Dev */}
+          {activeTab === 'game_dev' && (
+            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+              <div>
+                <h2 className="text-2xl font-black text-zinc-800">게임 개발 (테스트)</h2>
+                <p className="text-sm text-zinc-500 mt-1.5 font-medium font-sans">
+                  프로젝트 본 게임 흐름에 적용하지 않고, 여기서만 실험/테스트합니다.
+                </p>
+              </div>
+              <BowlingDevGame />
             </div>
           )}
 

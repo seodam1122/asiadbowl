@@ -29,6 +29,7 @@ export default function UserKioskPage() {
   const [couponQrDataUrl, setCouponQrDataUrl] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState<string>('roulette');
   const [gameSession, setGameSession] = useState(0);
+  const [spotDiffSceneIndex, setSpotDiffSceneIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Timer for auto-resetting the kiosk result screen
@@ -313,6 +314,10 @@ export default function UserKioskPage() {
                   type="button"
                   onClick={() => {
                     setSelectedGame(game.id);
+                    if (game.id === 'spot_diff') {
+                      // choose 1 of 10 scenes during user action (lint-safe)
+                      setSpotDiffSceneIndex(Math.floor(Math.random() * 10));
+                    }
                     setStep('game');
                   }}
                   className="touch-press flex flex-col items-center justify-center gap-6 rounded-3xl border border-zinc-200 bg-white px-5 py-14 text-center shadow-[0_4px_15px_rgba(0,0,0,0.06)] transition-all duration-300 hover:border-pink-500/30 hover:bg-zinc-50"
@@ -362,7 +367,12 @@ export default function UserKioskPage() {
           )}
 
           {selectedGame === 'spot_diff' && (
-            <SpotDifferenceGame key={gameSession} prizes={prizes} onFinished={handleGameFinished} />
+            <SpotDifferenceGame
+              key={gameSession}
+              prizes={prizes}
+              onFinished={handleGameFinished}
+              sceneIndex={spotDiffSceneIndex}
+            />
           )}
 
           {selectedGame === 'hidden_obj' && (

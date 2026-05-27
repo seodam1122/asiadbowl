@@ -5,6 +5,21 @@ import {
   buildAprilMayDummyParticipation,
   type DummySeedResult,
 } from './seed-dummy-participation';
+import {
+  pointsFromPrizeName,
+  type CustomerPoints,
+  type PointTransaction,
+  type PointTransactionType,
+} from './points';
+
+export type { CustomerPoints, PointTransaction, PointTransactionType } from './points';
+export { pointsFromPrizeName } from './points';
+
+export interface UseCouponResult {
+  log: EventLog;
+  pointsEarned: number;
+  balanceAfter: number;
+}
 
 export type { DummySeedResult } from './seed-dummy-participation';
 
@@ -73,6 +88,40 @@ export interface EventLog {
 }
 
 const CONTACT_CONSENTS_KEY = 'kiosk_contact_consents';
+const CUSTOMER_POINTS_KEY = 'kiosk_customer_points';
+const POINT_TRANSACTIONS_KEY = 'kiosk_point_transactions';
+
+export type PointsStorageMode = 'local' | 'supabase';
+
+let supabasePointsTablesReady: boolean | null = null;
+
+function isMissingPointsTableError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const code = (err as { code?: string }).code;
+  const message = String((err as { message?: string }).message ?? '');
+  return (
+    code === 'PGRST205' &&
+    (message.includes('customer_points') || message.includes('point_transactions'))
+  );
+}
+
+async function canUseSupabasePoints(): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  if (supabasePointsTablesReady === true) return true;
+  if (supabasePointsTablesReady === false) return false;
+
+  const { error } = await supabase.from('customer_points').select('phone_number').limit(1);
+  if (error) {
+    if (isMissingPointsTableError(error)) {
+      supabasePointsTablesReady = false;
+      return false;
+    }
+    supabasePointsTablesReady = false;
+    return false;
+  }
+  supabasePointsTablesReady = true;
+  return true;
+}
 
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '').slice(0, 11);
@@ -87,6 +136,21 @@ function findConsentRecord(
 ): ContactConsent | undefined {
   const normalized = normalizePhoneNumber(phoneNumber);
   return consents.find((c) => normalizePhoneNumber(c.phone_number) === normalized);
+}
+
+function mapPointTransactionRow(row: Record<string, unknown>): PointTransaction {
+  return {
+    id: row.id != null ? Number(row.id) : undefined,
+    phone_number: normalizePhoneNumber(String(row.phone_number)),
+    amount: Number(row.amount) || 0,
+    balance_after: Number(row.balance_after) || 0,
+    transaction_type: row.transaction_type as PointTransactionType,
+    reason: String(row.reason ?? ''),
+    coupon_code: row.coupon_code != null ? String(row.coupon_code) : null,
+    event_log_id: row.event_log_id != null ? Number(row.event_log_id) : null,
+    prize_name: row.prize_name != null ? String(row.prize_name) : null,
+    created_at: String(row.created_at),
+  };
 }
 
 // LocalStorage mock data initializers
@@ -725,12 +789,22 @@ export const db = {
     return null;
   },
 
-  async useCoupon(couponCode: string): Promise<EventLog> {
+  async useCoupon(couponCode: string): Promise<UseCouponResult> {
     const code = couponCode.trim();
     const timestamp = new Date().toISOString();
+    let log: EventLog | null = null;
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const { data: existing, error: fetchErr } = await supabase
+          .from('event_logs')
+          .select('*')
+          .eq('coupon_code', code)
+          .maybeSingle();
+        if (fetchErr) throw fetchErr;
+        if (!existing) throw new Error('쿠폰을 찾을 수 없습니다.');
+        if (existing.is_used) throw new Error('이미 사용 완료된 쿠폰입니다.');
+
         const { data, error } = await supabase
           .from('event_logs')
           .update({ is_used: true, used_at: timestamp })
@@ -738,26 +812,360 @@ export const db = {
           .select()
           .single();
         if (error) throw error;
-        return data;
+        log = data as EventLog;
       } catch (err) {
+        if (err instanceof Error && (err.message.includes('쿠폰') || err.message.includes('이미'))) {
+          throw err;
+        }
         console.error('Supabase useCoupon failed, using fallback:', err);
       }
     }
 
-    const logs = getLocalData<EventLog[]>('kiosk_event_logs', []);
-    const idx = logs.findIndex((l) => l.coupon_code === code);
-    if (idx === -1) {
-      throw new Error('쿠폰을 찾을 수 없습니다.');
-    }
-    
-    if (logs[idx].is_used) {
-      throw new Error('이미 사용 완료된 쿠폰입니다.');
+    if (!log) {
+      const logs = getLocalData<EventLog[]>('kiosk_event_logs', []);
+      const idx = logs.findIndex((l) => l.coupon_code === code);
+      if (idx === -1) {
+        throw new Error('쿠폰을 찾을 수 없습니다.');
+      }
+      if (logs[idx].is_used) {
+        throw new Error('이미 사용 완료된 쿠폰입니다.');
+      }
+      logs[idx].is_used = true;
+      logs[idx].used_at = timestamp;
+      setLocalData('kiosk_event_logs', logs);
+      log = logs[idx];
     }
 
-    logs[idx].is_used = true;
-    logs[idx].used_at = timestamp;
-    setLocalData('kiosk_event_logs', logs);
-    return logs[idx];
+    const credit = await this.creditPointsForCouponUse({
+      phoneNumber: log.phone_number,
+      prizeName: log.prize_name,
+      couponCode: code,
+      eventLogId: log.id,
+    });
+
+    return {
+      log,
+      pointsEarned: credit.pointsEarned,
+      balanceAfter: credit.balanceAfter,
+    };
+  },
+
+  async getPointsStorageInfo(): Promise<{
+    mode: PointsStorageMode;
+    supabaseConfigured: boolean;
+    tablesReady: boolean;
+  }> {
+    const tablesReady = await canUseSupabasePoints();
+    return {
+      mode: tablesReady ? 'supabase' : 'local',
+      supabaseConfigured: isSupabaseConfigured,
+      tablesReady,
+    };
+  },
+
+  async getCustomerPointsList(): Promise<CustomerPoints[]> {
+    if (await canUseSupabasePoints()) {
+      try {
+        const { data, error } = await supabase!
+          .from('customer_points')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map((row) => ({
+          phone_number: normalizePhoneNumber(row.phone_number),
+          balance: Number(row.balance) || 0,
+          updated_at: row.updated_at,
+        }));
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase getCustomerPointsList failed, using fallback:', err);
+        }
+      }
+    }
+
+    const list = getLocalData<CustomerPoints[]>(CUSTOMER_POINTS_KEY, []);
+    return [...list].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+  },
+
+  async getPointTransactions(phoneNumber?: string): Promise<PointTransaction[]> {
+    const phone = phoneNumber ? normalizePhoneNumber(phoneNumber) : undefined;
+
+    if (await canUseSupabasePoints()) {
+      try {
+        let query = supabase!
+          .from('point_transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(phone ? 200 : 500);
+        if (phone) {
+          query = query.eq('phone_number', phone);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data ?? []).map(mapPointTransactionRow);
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase getPointTransactions failed, using fallback:', err);
+        }
+      }
+    }
+
+    let txs = getLocalData<PointTransaction[]>(POINT_TRANSACTIONS_KEY, []);
+    if (phone) {
+      txs = txs.filter((t) => normalizePhoneNumber(t.phone_number) === phone);
+    }
+    return txs.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  },
+
+  async getCustomerPoints(phoneNumber: string): Promise<CustomerPoints> {
+    const phone = normalizePhoneNumber(phoneNumber);
+
+    if (await canUseSupabasePoints()) {
+      try {
+        const { data, error } = await supabase!
+          .from('customer_points')
+          .select('*')
+          .eq('phone_number', phone)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          return {
+            phone_number: phone,
+            balance: Number(data.balance) || 0,
+            updated_at: data.updated_at,
+          };
+        }
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase getCustomerPoints failed, using fallback:', err);
+        }
+      }
+    }
+
+    const list = getLocalData<CustomerPoints[]>(CUSTOMER_POINTS_KEY, []);
+    const found = list.find((p) => normalizePhoneNumber(p.phone_number) === phone);
+    return (
+      found ?? {
+        phone_number: phone,
+        balance: 0,
+        updated_at: new Date().toISOString(),
+      }
+    );
+  },
+
+  async adjustCustomerPoints(
+    phoneNumber: string,
+    amount: number,
+    reason: string,
+    mode: 'add' | 'subtract'
+  ): Promise<{ account: CustomerPoints; transaction: PointTransaction }> {
+    const phone = normalizePhoneNumber(phoneNumber);
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 11) {
+      throw new Error('올바른 휴대폰 번호를 입력해 주세요.');
+    }
+    const delta = Math.abs(Math.round(amount));
+    if (delta <= 0) {
+      throw new Error('포인트는 1 이상이어야 합니다.');
+    }
+    const trimmedReason = reason.trim() || (mode === 'add' ? '관리자 포인트 지급' : '관리자 포인트 차감');
+    const signedAmount = mode === 'add' ? delta : -delta;
+    const type: PointTransactionType = mode === 'add' ? 'admin_add' : 'admin_subtract';
+
+    const current = await this.getCustomerPoints(phone);
+    const nextBalance = current.balance + signedAmount;
+    if (nextBalance < 0) {
+      throw new Error(`포인트가 부족합니다. (현재 ${current.balance.toLocaleString()}P)`);
+    }
+
+    const now = new Date().toISOString();
+    const transaction: PointTransaction = {
+      phone_number: phone,
+      amount: signedAmount,
+      balance_after: nextBalance,
+      transaction_type: type,
+      reason: trimmedReason,
+      created_at: now,
+    };
+
+    const account: CustomerPoints = {
+      phone_number: phone,
+      balance: nextBalance,
+      updated_at: now,
+    };
+
+    if (await canUseSupabasePoints()) {
+      try {
+        const { error: upsertErr } = await supabase!.from('customer_points').upsert({
+          phone_number: phone,
+          balance: nextBalance,
+          updated_at: now,
+        });
+        if (upsertErr) throw upsertErr;
+
+        const { data: inserted, error: txErr } = await supabase!
+          .from('point_transactions')
+          .insert({
+            phone_number: phone,
+            amount: signedAmount,
+            balance_after: nextBalance,
+            transaction_type: type,
+            reason: trimmedReason,
+          })
+          .select()
+          .single();
+        if (txErr) throw txErr;
+
+        return {
+          account,
+          transaction: mapPointTransactionRow(inserted),
+        };
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase adjustCustomerPoints failed, using fallback:', err);
+        }
+      }
+    }
+
+    const accounts = getLocalData<CustomerPoints[]>(CUSTOMER_POINTS_KEY, []);
+    const idx = accounts.findIndex((p) => normalizePhoneNumber(p.phone_number) === phone);
+    if (idx === -1) accounts.push(account);
+    else accounts[idx] = account;
+    setLocalData(CUSTOMER_POINTS_KEY, accounts);
+
+    const txs = getLocalData<PointTransaction[]>(POINT_TRANSACTIONS_KEY, []);
+    const nextId = txs.reduce((max, t) => Math.max(max, t.id ?? 0), 0) + 1;
+    const savedTx = { ...transaction, id: nextId };
+    txs.unshift(savedTx);
+    setLocalData(POINT_TRANSACTIONS_KEY, txs);
+
+    return { account, transaction: savedTx };
+  },
+
+  async creditPointsForCouponUse(params: {
+    phoneNumber: string;
+    prizeName: string;
+    couponCode: string;
+    eventLogId?: number;
+  }): Promise<{ pointsEarned: number; balanceAfter: number }> {
+    const phone = normalizePhoneNumber(params.phoneNumber);
+    const code = params.couponCode.trim();
+    const earn = pointsFromPrizeName(params.prizeName);
+    const current = await this.getCustomerPoints(phone);
+
+    if (earn <= 0) {
+      return { pointsEarned: 0, balanceAfter: current.balance };
+    }
+
+    const already = await this.hasCouponPointCredit(code);
+    if (already) {
+      return { pointsEarned: 0, balanceAfter: current.balance };
+    }
+
+    const nextBalance = current.balance + earn;
+    const now = new Date().toISOString();
+    const reason = `쿠폰 사용 적립 (${params.prizeName})`;
+
+    if (await canUseSupabasePoints()) {
+      try {
+        const { error: upsertErr } = await supabase!.from('customer_points').upsert({
+          phone_number: phone,
+          balance: nextBalance,
+          updated_at: now,
+        });
+        if (upsertErr) throw upsertErr;
+
+        const { error: txErr } = await supabase!.from('point_transactions').insert({
+          phone_number: phone,
+          amount: earn,
+          balance_after: nextBalance,
+          transaction_type: 'coupon_earn',
+          reason,
+          coupon_code: code,
+          event_log_id: params.eventLogId ?? null,
+          prize_name: params.prizeName,
+        });
+        if (txErr) throw txErr;
+
+        return { pointsEarned: earn, balanceAfter: nextBalance };
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase creditPointsForCouponUse failed, using fallback:', err);
+        }
+      }
+    }
+
+    const accounts = getLocalData<CustomerPoints[]>(CUSTOMER_POINTS_KEY, []);
+    const account: CustomerPoints = {
+      phone_number: phone,
+      balance: nextBalance,
+      updated_at: now,
+    };
+    const aIdx = accounts.findIndex((p) => normalizePhoneNumber(p.phone_number) === phone);
+    if (aIdx === -1) accounts.push(account);
+    else accounts[aIdx] = account;
+    setLocalData(CUSTOMER_POINTS_KEY, accounts);
+
+    const txs = getLocalData<PointTransaction[]>(POINT_TRANSACTIONS_KEY, []);
+    const nextId = txs.reduce((max, t) => Math.max(max, t.id ?? 0), 0) + 1;
+    txs.unshift({
+      id: nextId,
+      phone_number: phone,
+      amount: earn,
+      balance_after: nextBalance,
+      transaction_type: 'coupon_earn',
+      reason,
+      coupon_code: code,
+      event_log_id: params.eventLogId ?? null,
+      prize_name: params.prizeName,
+      created_at: now,
+    });
+    setLocalData(POINT_TRANSACTIONS_KEY, txs);
+
+    return { pointsEarned: earn, balanceAfter: nextBalance };
+  },
+
+  async hasCouponPointCredit(couponCode: string): Promise<boolean> {
+    const code = couponCode.trim();
+    if (!code) return false;
+
+    if (await canUseSupabasePoints()) {
+      try {
+        const { data, error } = await supabase!
+          .from('point_transactions')
+          .select('id')
+          .eq('coupon_code', code)
+          .eq('transaction_type', 'coupon_earn')
+          .maybeSingle();
+        if (error) throw error;
+        return Boolean(data);
+      } catch (err) {
+        if (isMissingPointsTableError(err)) {
+          supabasePointsTablesReady = false;
+        } else {
+          console.error('Supabase hasCouponPointCredit failed, using fallback:', err);
+        }
+      }
+    }
+
+    const txs = getLocalData<PointTransaction[]>(POINT_TRANSACTIONS_KEY, []);
+    return txs.some(
+      (t) => t.transaction_type === 'coupon_earn' && (t.coupon_code ?? '').trim() === code
+    );
   },
 
   async updateEventLogAlimtalkStatus(
