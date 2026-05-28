@@ -79,7 +79,10 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-9 px-6 pb-[10vh] pt-2 -translate-y-5">
+      <div
+        className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-9 px-6 pb-[10vh] pt-2 -translate-y-5"
+        style={{ zoom: 1.3 }}
+      >
       {/* Title section */}
       <div className="w-full text-center">
         <div className="mb-5 inline-flex rounded-full border border-pink-500/20 bg-gradient-to-tr from-pink-500/10 to-indigo-500/10 p-6">
@@ -96,13 +99,15 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
       {/* Input panel */}
       <div className="w-full">
         <div className="relative flex min-h-[126px] w-full items-center justify-center overflow-hidden rounded-3xl border-2 border-zinc-200 bg-zinc-100 px-8 py-5 text-center">
-          {phoneNumber ? (
-            <span className="text-5xl font-mono font-black tracking-widest text-zinc-800 sm:text-6xl">
-              {phoneNumber}
-            </span>
-          ) : (
-            <span className="text-3xl font-medium text-zinc-400">010-0000-0000</span>
-          )}
+          <div className="flex w-full justify-center">
+            <div className="w-[13ch] whitespace-nowrap text-left text-5xl font-mono font-black tracking-[0.06em] tabular-nums sm:text-6xl">
+            {phoneNumber ? (
+              <span className="text-zinc-800">{phoneNumber}</span>
+            ) : (
+              <span className="text-zinc-400">010-1234-5678</span>
+            )}
+            </div>
+          </div>
           {loading && (
             <div className="absolute right-6">
               <Loader2 className="h-9 w-9 animate-spin text-pink-500" />
@@ -138,7 +143,7 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
           <button
             type="button"
             onClick={() => handleKeyPress('clear')}
-            className="touch-press select-none rounded-3xl bg-zinc-100 py-7 text-base font-bold text-zinc-500 hover:bg-zinc-200/80"
+            className="touch-press select-none rounded-3xl bg-zinc-100 py-7 text-2xl font-black text-zinc-500 hover:bg-zinc-200/80"
           >
             전체삭제
           </button>
@@ -162,9 +167,10 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
         <div className="space-y-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-7">
           <p className="text-sm leading-relaxed font-medium text-zinc-600">
             <span className="font-bold text-zinc-800">[필수] </span>
-            이벤트 참여·중복 방지·당첨 안내(카카오 알림톡)를 위해 휴대폰 번호를 수집·이용합니다. (보유 기간: 이벤트 종료 후 1년)
+            회사는 이벤트 참여자 본인확인, 1인 1일 1회 참여 제한을 위한 중복 참여 검증, 당첨 결과 확인 및
+            쿠폰 지급 안내, 부정 이용 방지와 민원 대응을 목적으로 휴대폰 번호를 수집·이용합니다. 필수 항목 미동의 시 이벤트 참여가 제한될 수 있습니다.
           </p>
-          <label className="flex cursor-pointer select-none items-start gap-4 touch-press">
+          <label className="flex cursor-pointer select-none items-center gap-4 touch-press">
             <input
               type="checkbox"
               checked={agreed}
@@ -172,9 +178,9 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
                 setAgreed(e.target.checked);
                 if (e.target.checked) setError(null);
               }}
-              className="mt-1 h-9 w-9 shrink-0 cursor-pointer rounded-md border-zinc-300 text-pink-500 focus:ring-pink-500/40"
+              className="h-8 w-8 shrink-0 cursor-pointer rounded-md border-zinc-300 text-pink-500 focus:ring-pink-500/40"
             />
-            <span className="text-lg font-bold leading-snug text-zinc-800">
+            <span className="text-xl font-bold leading-none text-zinc-800">
               개인정보 수집·이용에 동의합니다.
             </span>
           </label>
@@ -185,7 +191,7 @@ export default function PhoneNumberInput({ onVerified }: PhoneNumberInputProps) 
           type="button"
           onClick={() => handleSubmit()}
           disabled={digits.length < 10 || !agreed || loading}
-          className={`flex w-full items-center justify-center gap-3 rounded-3xl py-7 text-2xl font-bold shadow-lg touch-press transition-all duration-300 ${
+          className={`flex w-full items-center justify-center gap-3 rounded-3xl py-9 text-3xl font-black shadow-lg touch-press transition-all duration-300 ${
             digits.length >= 10 && agreed && !loading
               ? 'bg-gradient-to-r from-pink-500 to-indigo-600 text-white cursor-pointer active:shadow-indigo-500/20 active:brightness-110 shadow-indigo-500/10'
               : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-zinc-300/30 shadow-none'

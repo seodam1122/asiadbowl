@@ -178,7 +178,7 @@ export default function UserKioskPage() {
           setAlimtalkNotice(null);
         } else {
           setAlimtalkNotice(
-            '알림톡 발송에 실패했습니다. 아래 쿠폰 번호를 직원에게 보여 주세요.'
+            '아래 QR코드로 쿠폰을 다운로드한 뒤 \n직원에게 보여주세요.'
           );
         }
       } else {
@@ -254,10 +254,10 @@ export default function UserKioskPage() {
                 <ArrowRight className="h-16 w-16 shrink-0 animate-pulse" />
               </button>
               <p
-                className="mt-5 text-center text-lg font-bold leading-snug tracking-wide text-amber-200"
+                className="mt-6 text-center text-3xl font-black leading-tight tracking-tight text-zinc-900 sm:text-4xl"
                 style={{
-                  textShadow:
-                    '0 0 12px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1)',
+                  WebkitTextStroke: '1px rgba(254, 243, 199, 0.95)',
+                  paintOrder: 'stroke fill',
                 }}
               >
                 * 본 이벤트는 1인 1일 1회만 참여 가능합니다.
@@ -275,9 +275,9 @@ export default function UserKioskPage() {
             <button
               type="button"
               onClick={handleResetKiosk}
-              className="touch-press flex items-center gap-2 text-lg font-bold text-zinc-600 transition-colors hover:text-zinc-900"
+              className="touch-press flex items-center gap-3 text-2xl font-black text-zinc-600 transition-colors hover:text-zinc-900"
             >
-              <ChevronLeft className="h-8 w-8 text-zinc-500" />
+              <ChevronLeft className="h-10 w-10 text-zinc-500" />
               <span>처음으로</span>
             </button>
           </div>
@@ -289,7 +289,10 @@ export default function UserKioskPage() {
       {/* 2.5 Game Selection Screen */}
       {step === 'select_game' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white select-none animate-fade-in">
-          <div className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-12 px-6 py-6 -translate-y-4">
+          <div
+            className="mx-auto flex w-full max-w-[min(100%,48rem)] flex-1 flex-col items-center justify-center gap-12 px-6 py-6 -translate-y-4"
+            style={{ zoom: 1.3 }}
+          >
             <div className="w-full text-center">
               <span className="inline-block rounded-full border border-pink-500/20 bg-pink-500/10 px-6 py-2 text-base font-semibold text-pink-600">
                 GAME SELECT
@@ -433,7 +436,7 @@ export default function UserKioskPage() {
                   </div>
                 )}
                 {alimtalkNotice && (
-                  <p className="mx-auto mt-6 max-w-xl text-2xl font-semibold leading-relaxed text-indigo-600">
+                  <p className="mx-auto mt-6 max-w-xl whitespace-pre-line text-2xl font-semibold leading-relaxed text-indigo-600">
                     {alimtalkNotice}
                   </p>
                 )}

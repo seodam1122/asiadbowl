@@ -279,68 +279,76 @@ export default function PointsManager({ onStatus }: PointsManagerProps) {
         <input
           type="tel"
           value={searchDigits}
-          onChange={(e) => setSearchDigits(formatPhoneInput(e.target.value))}
+          onChange={(e) =>
+            setSearchDigits(
+              e.target.value
+                .replace(/[^\d-]/g, '')
+                .slice(0, 13)
+            )
+          }
           placeholder="연락처 검색 (숫자)"
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm font-mono outline-none focus:border-pink-500/50"
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="overflow-x-auto border border-zinc-200 rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 text-[10px] uppercase font-bold tracking-wider">
-                <th className="py-3 px-4">연락처</th>
-                <th className="py-3 px-4">잔액</th>
-                <th className="py-3 px-4">최종 변경</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 text-xs">
-              {filteredAccounts.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-10 text-center text-zinc-500 font-medium">
-                    {loading ? '불러오는 중…' : '포인트 내역이 없습니다.'}
-                  </td>
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        <div className="flex h-[460px] flex-col overflow-hidden border border-zinc-200 rounded-2xl bg-white shadow-sm">
+          <div className="overflow-x-auto overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 text-[10px] uppercase font-bold tracking-wider">
+                  <th className="py-3 px-4">연락처</th>
+                  <th className="py-3 px-4">잔액</th>
+                  <th className="py-3 px-4">최종 변경</th>
                 </tr>
-              ) : (
-                filteredAccounts.map((acc) => {
-                  const phone = normalizePhoneNumber(acc.phone_number);
-                  const active = selectedPhone === phone;
-                  return (
-                    <tr
-                      key={phone}
-                      onClick={() => setSelectedPhone(phone)}
-                      className={`cursor-pointer transition-colors ${
-                        active ? 'bg-pink-50/80' : 'hover:bg-zinc-50/50'
-                      }`}
-                    >
-                      <td className="py-3 px-4 font-bold text-zinc-800">{phone}</td>
-                      <td className="py-3 px-4 font-mono font-black text-pink-600">
-                        {acc.balance.toLocaleString()}P
-                      </td>
-                      <td className="py-3 px-4 text-zinc-500">
-                        {new Date(acc.updated_at).toLocaleString('ko-KR')}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 text-xs">
+                {filteredAccounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-10 text-center text-zinc-500 font-medium">
+                      {loading ? '불러오는 중…' : '포인트 내역이 없습니다.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAccounts.map((acc) => {
+                    const phone = normalizePhoneNumber(acc.phone_number);
+                    const active = selectedPhone === phone;
+                    return (
+                      <tr
+                        key={phone}
+                        onClick={() => setSelectedPhone(phone)}
+                        className={`cursor-pointer transition-colors ${
+                          active ? 'bg-pink-50/80' : 'hover:bg-zinc-50/50'
+                        }`}
+                      >
+                        <td className="py-3 px-4 font-bold text-zinc-800">{phone}</td>
+                        <td className="py-3 px-4 font-mono font-black text-pink-600">
+                          {acc.balance.toLocaleString()}P
+                        </td>
+                        <td className="py-3 px-4 text-zinc-500">
+                          {new Date(acc.updated_at).toLocaleString('ko-KR')}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-sm font-black text-zinc-700">
-            {selectedPhone
-              ? `${selectedPhone} 거래 내역`
-              : '최근 거래 내역 (전체)'}
-          </h3>
-          {selectedAccount && (
-            <p className="text-lg font-black text-pink-600">
-              현재 잔액: {selectedAccount.balance.toLocaleString()}P
-            </p>
-          )}
-          <div className="max-h-[420px] overflow-y-auto border border-zinc-200 rounded-2xl bg-white divide-y divide-zinc-100">
+        <div className="flex h-[460px] flex-col overflow-hidden border border-zinc-200 rounded-2xl bg-white shadow-sm">
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <h3 className="text-sm font-black text-zinc-700">
+              {selectedPhone ? `${selectedPhone} 거래 내역` : '최근 거래 내역 (전체)'}
+            </h3>
+            {selectedAccount && (
+              <p className="mt-1 text-base font-black text-pink-600">
+                현재 잔액: {selectedAccount.balance.toLocaleString()}P
+              </p>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-scroll divide-y divide-zinc-100 pr-1">
             {selectedTransactions.length === 0 ? (
               <p className="p-6 text-center text-sm text-zinc-500">거래 내역이 없습니다.</p>
             ) : (
