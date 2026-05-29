@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MANUAL.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h1 id="%F0%9F%93%96-%EC%95%84%EC%8B%9C%EC%95%84%EB%93%9C-%EB%B3%BC%EB%A7%81%EC%9E%A5-%ED%82%A4%EC%98%A4%EC%8A%A4%ED%81%AC-%EC%9D%B4%EB%B2%A4%ED%8A%B8--%EA%B8%B0%EB%8A%A5-%EB%A7%A4%EB%89%B4%EC%96%BC">📖 아시아드 볼링장 키오스크 이벤트 — 기능 매뉴얼</h1>
+<p>이 문서는 키오스크 이벤트 웹앱의 화면별 기능을 <strong>실제 화면 캡쳐</strong>와 함께 설명하는 사용 매뉴얼입니다.</p>
+<ul>
+<li>키오스크(고객) 주소: <code>http://localhost:3010</code></li>
+<li>관리자 주소: <code>http://localhost:3010/admin</code> (기본 비밀번호 <code>0077</code>)</li>
+<li>쿠폰 다운로드 주소: <code>http://localhost:3010/coupon?c=쿠폰번호</code></li>
+</ul>
+<blockquote>
+<p>캡쳐 이미지는 <code>docs/screenshots/</code> 폴더에 저장되어 있으며, <code>node scripts/capture-screenshots.mjs</code>로 다시 생성할 수 있습니다. (dev 서버 실행 필요)</p>
+</blockquote>
+<hr>
+<h2 id="1%EB%B6%80-%EA%B3%A0%EA%B0%9D%EC%9A%A9-%ED%82%A4%EC%98%A4%EC%8A%A4%ED%81%AC-%ED%99%94%EB%A9%B4">1부. 고객용 키오스크 화면</h2>
+<h3 id="1-%EB%8C%80%EA%B8%B0%EB%9E%9C%EB%94%A9-%ED%99%94%EB%A9%B4">1) 대기/랜딩 화면</h3>
+<p>키오스크 대기 상태에서 노출되는 첫 화면입니다. 관리자가 등록한 광고 타이틀·배너 이미지가 표시되며, 하단의 <strong>터치하여 시작하기</strong> 버튼으로 참여를 시작합니다.</p>
+<ul>
+<li>화면 하단에 <code>* 본 이벤트는 1인 1일 1회만 참여 가능합니다.</code> 안내 문구 노출</li>
+<li>일정 시간 입력이 없으면 자동으로 이 화면으로 복귀</li>
+</ul>
+<p><img src="./screenshots/01-landing.png" alt="랜딩 화면"></p>
+<hr>
+<h3 id="2-%EB%B3%B8%EC%9D%B8%EC%9D%B8%EC%A6%9D-%ED%9C%B4%EB%8C%80%ED%8F%B0-%EB%B2%88%ED%98%B8-%EC%9E%85%EB%A0%A5">2) 본인인증 (휴대폰 번호 입력)</h3>
+<p>중복 참여 방지를 위해 휴대폰 번호를 입력하는 화면입니다.</p>
+<ul>
+<li>대형 터치 키패드로 휴대폰 번호 11자리 입력 (<code>010-0000-0000</code> 형식 자동 표시)</li>
+<li><strong>[필수] 개인정보 수집·이용 동의</strong> 체크 필요</li>
+<li>번호 + 동의가 완료되면 <strong>이벤트 참여하기</strong> 버튼 활성화</li>
+<li>같은 번호가 오늘 이미 참여했다면 &quot;오늘 이미 참여하셨습니다&quot; 안내 후 차단</li>
+</ul>
+<p><img src="./screenshots/02-auth.png" alt="본인인증 화면"></p>
+<hr>
+<h3 id="3-%EA%B2%8C%EC%9E%84-%EC%84%A0%ED%83%9D">3) 게임 선택</h3>
+<p>참여할 미니게임을 고르는 화면입니다. 4종 중 하나를 선택합니다.</p>
+<table>
+<thead>
+<tr>
+<th>게임</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🎡 행운의 룰렛</td>
+<td>돌려서 확률에 따라 경품 당첨</td>
+</tr>
+<tr>
+<td>🎫 스크래치 복권</td>
+<td>화면을 긁어서 경품 확인</td>
+</tr>
+<tr>
+<td>🔍 틀린그림찾기</td>
+<td>두 그림의 다른 곳 3군데 찾기 (10종 테마)</td>
+</tr>
+<tr>
+<td>🎨 숨은그림찾기</td>
+<td>그림 속 숨은 물건 찾기</td>
+</tr>
+</tbody>
+</table>
+<p><img src="./screenshots/03-game-select.png" alt="게임 선택 화면"></p>
+<hr>
+<h3 id="4-%EA%B2%8C%EC%9E%84-%EC%A7%84%ED%96%89-%EC%98%88-%ED%96%89%EC%9A%B4%EC%9D%98-%EB%A3%B0%EB%A0%9B">4) 게임 진행 (예: 행운의 룰렛)</h3>
+<p>선택한 미니게임이 실행됩니다. 아래는 룰렛 예시이며, 게임 종료 시 당첨 경품이 결정됩니다.</p>
+<ul>
+<li>당첨 시 축하 효과(Confetti)와 함께 결과 화면으로 이동</li>
+<li>결과 화면에서 쿠폰 번호와 QR 코드 제공</li>
+<li>당첨 안내는 카카오 알림톡으로 발송(설정 시), 미발송 시 QR로 쿠폰 다운로드 안내</li>
+</ul>
+<p><img src="./screenshots/04-game-roulette.png" alt="게임 진행 화면 (룰렛)"></p>
+<hr>
+<h3 id="5-%EC%BF%A0%ED%8F%B0-%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C-%ED%8E%98%EC%9D%B4%EC%A7%80">5) 쿠폰 다운로드 페이지</h3>
+<p>결과 화면의 QR을 휴대폰으로 스캔하면 열리는 페이지입니다. 쿠폰 번호가 담긴 이미지를 자동으로 저장합니다.</p>
+<ul>
+<li>유효한 쿠폰: 쿠폰 이미지 자동 다운로드 + <strong>다시 저장하기</strong> 버튼</li>
+<li>잘못된 쿠폰: &quot;유효하지 않은 쿠폰입니다&quot; 오류 표시</li>
+</ul>
+<p><img src="./screenshots/05-coupon-download.png" alt="쿠폰 다운로드 페이지"></p>
+<hr>
+<h2 id="2%EB%B6%80-%EA%B4%80%EB%A6%AC%EC%9E%90-%EB%8C%80%EC%8B%9C%EB%B3%B4%EB%93%9C-admin">2부. 관리자 대시보드 (<code>/admin</code>)</h2>
+<h3 id="6-%EA%B4%80%EB%A6%AC%EC%9E%90-%EB%A1%9C%EA%B7%B8%EC%9D%B8">6) 관리자 로그인</h3>
+<p>대시보드 진입 전 비밀번호(기본 <code>0077</code>)를 입력합니다.</p>
+<p><img src="./screenshots/06-admin-login.png" alt="관리자 로그인"></p>
+<hr>
+<h3 id="7-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%B0%B8%EC%97%AC-%ED%98%84%ED%99%A9">7) 이벤트 참여 현황</h3>
+<p>참여자의 실시간 기록을 조회·관리합니다.</p>
+<ul>
+<li>기간(시작일/종료일), 연락처로 필터링 / 오늘·이번주·이번달 빠른 조회</li>
+<li>참여 통계 카드(검색 결과 수, 오늘 참여자, 당첨 경품 종류)</li>
+<li>목록: 연락처, 수집·이용 동의 상태, 당첨 경품, 쿠폰 번호, 알림톡 상태, 사용 여부, 참여 일시</li>
+<li><strong>CSV 다운로드</strong> 지원</li>
+</ul>
+<p><img src="./screenshots/07-admin-logs.png" alt="이벤트 참여 현황"></p>
+<hr>
+<h3 id="8-%EC%BF%A0%ED%8F%B0-%EA%B4%80%EB%A6%AC-%EB%B0%8F-%EA%B2%80%EC%A6%9D">8) 쿠폰 관리 및 검증</h3>
+<p>직원이 고객의 쿠폰을 조회하고 사용 처리(차감)하는 화면입니다.</p>
+<ul>
+<li>쿠폰 번호로 조회 → 경품/연락처/사용 여부 확인</li>
+<li><strong>사용 완료 처리</strong> 시 포인트 자동 적립(경품명에 point가 있을 경우)</li>
+</ul>
+<p><img src="./screenshots/08-admin-coupons.png" alt="쿠폰 관리 및 검증"></p>
+<hr>
+<h3 id="9-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EA%B4%80%EB%A6%AC">9) 포인트 관리</h3>
+<p>연락처(휴대폰)별 포인트 잔액과 거래 내역을 관리합니다.</p>
+<ul>
+<li>등록 고객 수 / 총 보유 포인트 / 자동 적립 예시 요약</li>
+<li><strong>포인트 수동 조정</strong>: 연락처·포인트·사유 입력 후 추가/차감</li>
+<li>좌측: 연락처별 잔액·최종 변경 / 우측: 거래 내역(쿠폰 적립·관리자 지급·차감)</li>
+<li>쿠폰 사용 시 경품명에 <code>point</code>가 있으면 자동 적립 (예: &quot;2000 point&quot; → +2,000P)</li>
+</ul>
+<p><img src="./screenshots/09-admin-points.png" alt="포인트 관리"></p>
+<hr>
+<h3 id="10-%EA%B4%91%EA%B3%A0-%EA%B4%80%EB%A6%AC">10) 광고 관리</h3>
+<p>랜딩 화면에 노출되는 광고 문구와 배너 이미지를 설정합니다.</p>
+<ul>
+<li>광고 타이틀 / 서브타이틀 수정</li>
+<li>배너 이미지 URL 입력 또는 파일 업로드(Supabase Storage 저장)</li>
+</ul>
+<p><img src="./screenshots/10-admin-ads.png" alt="광고 관리"></p>
+<hr>
+<h3 id="11-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EB%B0%8F-%EA%B2%BD%ED%92%88-%EC%84%A4%EC%A0%95">11) 이벤트 및 경품 설정</h3>
+<p>진행할 게임과 경품·당첨 확률을 관리합니다.</p>
+<ul>
+<li>활성 미니게임 지정</li>
+<li>경품 추가/수정, 이미지 업로드, 당첨 확률 설정(합계 100% 검증)</li>
+</ul>
+<p><img src="./screenshots/11-admin-prizes.png" alt="이벤트 및 경품 설정"></p>
+<hr>
+<h3 id="12-%EA%B2%8C%EC%9E%84-%EA%B0%9C%EB%B0%9C">12) 게임 개발</h3>
+<p>운영 키오스크 흐름과 분리된, 관리자 전용 게임 테스트 공간입니다. (예: 볼링 미니게임)</p>
+<p><img src="./screenshots/12-admin-game-dev.png" alt="게임 개발"></p>
+<hr>
+<h2 id="%EB%B6%80%EB%A1%9D-%EC%BA%A1%EC%B3%90-%EB%8B%A4%EC%8B%9C-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0">부록. 캡쳐 다시 생성하기</h2>
+<p>화면이 바뀌면 아래로 캡쳐를 갱신할 수 있습니다.</p>
+<pre class="hljs"><code><div><span class="hljs-comment"># 1) 개발 서버 실행 (포트 3010)</span>
+npm run dev
+
+<span class="hljs-comment"># 2) 다른 터미널에서 캡쳐 실행</span>
+node scripts/capture-screenshots.mjs
+</div></code></pre>
+<ul>
+<li>출력 위치: <code>docs/screenshots/*.png</code></li>
+<li>옵션: <code>KIOSK_BASE_URL</code>(기본 <code>http://localhost:3010</code>), <code>DEMO_COUPON</code>(쿠폰 페이지 캡쳐용 쿠폰 번호)</li>
+</ul>
+
+</body>
+</html>
