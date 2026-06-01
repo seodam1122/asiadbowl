@@ -16,19 +16,23 @@ import {
   stripUrlCacheBust,
 } from '@/lib/kiosk-storage-url';
 import { getSupabaseConnectionHint, isSupabaseConfigured } from '@/lib/supabase';
+import { isCouponExpired, formatCouponExpiryShort } from '@/lib/coupon-expiry';
 import { 
   Lock, KeyRound, ShieldAlert, Users, Image as ImageIcon, 
   Settings as SettingsIcon, Download, Save, CheckCircle2, 
   AlertTriangle, Play, HelpCircle, LogOut, Ticket, Search, Check, XCircle,
-  ChevronLeft, ChevronRight, RotateCcw, Calendar, Gamepad2, Coins
+  ChevronLeft, ChevronRight, ChevronDown, RotateCcw, Calendar, Gamepad2, Coins, Wrench
 } from 'lucide-react';
 
 import BowlingDevGame from '@/components/admin/BowlingDevGame';
 import PointsManager from '@/components/admin/PointsManager';
 
-type TabType = 'logs' | 'coupons' | 'points' | 'ads' | 'prizes' | 'game_dev';
+type TabType = 'logs' | 'coupons' | 'points' | 'ads' | 'prizes' | 'game_dev' | 'points_dev' | 'logs_dev';
 
 const LOGS_PAGE_SIZE = 10;
+
+/** 개발자 모드 진입 비밀번호 */
+const DEV_MODE_PASSWORD = '7044';
 
 type LogDateRange = { start: string; end: string };
 
@@ -132,6 +136,11 @@ export default function AdminPage() {
 
   // Dashboard Data State
   const [activeTab, setActiveTab] = useState<TabType>('logs');
+  const [devMenuOpen, setDevMenuOpen] = useState(false);
+  const [devUnlocked, setDevUnlocked] = useState(false);
+  const [devPromptOpen, setDevPromptOpen] = useState(false);
+  const [devPasswordInput, setDevPasswordInput] = useState('');
+  const [devPasswordError, setDevPasswordError] = useState(false);
   const [logs, setLogs] = useState<EventLog[]>([]);
   const [consentMap, setConsentMap] = useState<Record<string, ContactConsentStatus>>({});
   const [consentUpdatingPhone, setConsentUpdatingPhone] = useState<string | null>(null);
@@ -172,6 +181,7 @@ export default function AdminPage() {
   const [logAppliedPhoneDigits, setLogAppliedPhoneDigits] = useState('');
   const [logPhoneSearchError, setLogPhoneSearchError] = useState<string | null>(null);
   const [logPage, setLogPage] = useState(1);
+  const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
 
   const filteredLogs = useMemo(() => {
     let result = logs;
@@ -217,6 +227,24 @@ export default function AdminPage() {
     const start = (safeLogPage - 1) * LOGS_PAGE_SIZE;
     return filteredLogs.slice(start, start + LOGS_PAGE_SIZE);
   }, [filteredLogs, safeLogPage]);
+
+  const selectablePageLogIds = useMemo(
+    () =>
+      paginatedLogs
+        .map((log) => log.id)
+        .filter((id): id is number => id != null && Number.isFinite(Number(id)))
+        .map(Number),
+    [paginatedLogs]
+  );
+
+  const selectedLogIdSet = useMemo(() => new Set(selectedLogIds), [selectedLogIds]);
+
+  const allPageLogsSelected =
+    selectablePageLogIds.length > 0 &&
+    selectablePageLogIds.every((id) => selectedLogIdSet.has(id));
+
+  const somePageLogsSelected =
+    selectablePageLogIds.some((id) => selectedLogIdSet.has(id)) && !allPageLogsSelected;
 
   const applyLogRange = (start: string, end: string) => {
     const range = normalizeLogDateRange(start, end);
@@ -300,6 +328,7 @@ export default function AdminPage() {
       setCouponError('쿠폰 조회 중 네트워크 오류가 발생했습니다.');
     } finally {
       setCouponLoading(false);
+      setCouponSearchInput('');
     }
   };
 
@@ -444,7 +473,13 @@ export default function AdminPage() {
         log.prize_name,
         log.coupon_code || 'N/A',
         formatAlimtalkStatus(log.alimtalk_status),
-        log.is_used ? '사용완료' : '미사용',
+        log.coupon_code
+          ? log.is_used
+            ? '사용완료'
+            : isCouponExpired(log.created_at)
+              ? '기한만료'
+              : '미사용'
+          : 'N/A',
         log.used_at ? new Date(log.used_at).toLocaleString('ko-KR') : 'N/A',
         new Date(log.created_at).toLocaleString('ko-KR'),
       ];
@@ -671,6 +706,116 @@ export default function AdminPage() {
     setPrizeEdits(updated);
   };
 
+  const DEFAULT_PRIZE_IMAGE =
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400&auto=format&fit=crop&q=60';
+
+  const handleAddPrize = () => {
+    const maxId = prizeEdits.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0);
+    setPrizeEdits([
+      ...prizeEdits,
+      {
+        id: maxId + 1,
+        name: '새 경품',
+        image_url: DEFAULT_PRIZE_IMAGE,
+        probability: 0,
+      },
+    ]);
+  };
+
+  const handleRemovePrize = (index: number) => {
+    if (prizeEdits.length <= 2) {
+      setSaveStatus({ type: 'error', message: '경품은 최소 2개 이상이어야 합니다.' });
+      return;
+    }
+    setPrizeEdits(prizeEdits.filter((_, i) => i !== index));
+  };
+
+  const handleDevMenuClick = () => {
+    if (devUnlocked) {
+      setDevMenuOpen((v) => !v);
+      return;
+    }
+    setDevPasswordInput('');
+    setDevPasswordError(false);
+    setDevPromptOpen(true);
+  };
+
+  const submitDevPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (devPasswordInput === DEV_MODE_PASSWORD) {
+      setDevUnlocked(true);
+      setDevMenuOpen(true);
+      setDevPromptOpen(false);
+      setDevPasswordInput('');
+      setDevPasswordError(false);
+    } else {
+      setDevPasswordError(true);
+    }
+  };
+
+  const reloadLogs = async () => {
+    const [fetchedLogs, fetchedConsents] = await Promise.all([
+      db.getEventLogs(),
+      db.getContactConsentsMap(),
+    ]);
+    setLogs(fetchedLogs);
+    setConsentMap(fetchedConsents);
+  };
+
+  const toggleLogSelection = (id: number) => {
+    setSelectedLogIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllPageLogs = () => {
+    if (allPageLogsSelected) {
+      setSelectedLogIds((prev) =>
+        prev.filter((id) => !selectablePageLogIds.includes(id))
+      );
+    } else {
+      setSelectedLogIds((prev) => [
+        ...new Set([...prev, ...selectablePageLogIds]),
+      ]);
+    }
+  };
+
+  const handleDeleteSelectedLogs = async () => {
+    if (selectedLogIds.length === 0) {
+      setSaveStatus({ type: 'error', message: '삭제할 항목을 체크해 주세요.' });
+      return;
+    }
+    const ok = window.confirm(
+      `선택한 ${selectedLogIds.length}건의 참여 기록을 삭제합니다.\n이 작업은 되돌릴 수 없습니다. 계속할까요?`
+    );
+    if (!ok) return;
+    const deleteCount = selectedLogIds.length;
+    try {
+      await db.deleteEventLogs(selectedLogIds);
+      setSelectedLogIds([]);
+      await reloadLogs();
+      setLogPage(1);
+      setSaveStatus({
+        type: 'success',
+        message: `선택한 참여 기록 ${deleteCount}건을 삭제했습니다.`,
+      });
+    } catch (err) {
+      setSaveStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : '삭제 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  // 개발자 모드의 "참여 데이터 삭제" 탭 여부 (체크·선택 삭제)
+  const logsDeleteMode = activeTab === 'logs_dev';
+
+  useEffect(() => {
+    if (activeTab !== 'logs_dev') {
+      setSelectedLogIds([]);
+    }
+  }, [activeTab]);
+
   // 1. Locked Entry Screen
   if (!isAuthenticated) {
     return (
@@ -767,6 +912,72 @@ export default function AdminPage() {
         </div>
       </header>
 
+      {/* 개발자 모드 비밀번호 입력 모달 */}
+      {devPromptOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setDevPromptOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white border border-zinc-200 rounded-3xl shadow-xl p-7 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-zinc-900 text-white shrink-0">
+                <Wrench className="w-5 h-5" />
+              </span>
+              <div>
+                <h3 className="text-lg font-black text-zinc-800">개발자 모드</h3>
+                <p className="text-xs text-zinc-500 font-medium">접근하려면 비밀번호를 입력하세요.</p>
+              </div>
+            </div>
+
+            <form onSubmit={submitDevPassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    autoFocus
+                    value={devPasswordInput}
+                    onChange={(e) => {
+                      setDevPasswordInput(e.target.value);
+                      setDevPasswordError(false);
+                    }}
+                    placeholder="비밀번호"
+                    className={`w-full pl-10 pr-3 py-3 bg-zinc-50 border rounded-xl text-sm text-zinc-800 font-mono tracking-widest outline-none transition-colors ${
+                      devPasswordError
+                        ? 'border-red-400 focus:border-red-500'
+                        : 'border-zinc-200 focus:border-pink-500/50'
+                    }`}
+                  />
+                </div>
+                {devPasswordError && (
+                  <p className="text-xs font-bold text-red-500 pl-1">비밀번호가 올바르지 않습니다.</p>
+                )}
+              </div>
+
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDevPromptOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-zinc-200 text-zinc-600 font-bold text-sm hover:bg-zinc-50 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white font-bold text-sm shadow-md shadow-pink-500/10 transition-all"
+                >
+                  확인
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Main dashboard grid */}
       <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 md:p-10 flex flex-row gap-4 sm:gap-8">
         
@@ -793,7 +1004,7 @@ export default function AdminPage() {
             }`}
           >
             <Ticket className="w-5 h-5 shrink-0" />
-            <span className="hidden sm:inline">쿠폰 관리 및 검증</span>
+            <span className="hidden sm:inline">쿠폰 관리</span>
           </button>
 
           <button
@@ -808,41 +1019,74 @@ export default function AdminPage() {
             <span className="hidden sm:inline">포인트 관리</span>
           </button>
 
-          <button
-            onClick={() => { setActiveTab('ads'); setSaveStatus({ type: null, message: '' }); }}
-            className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
-              activeTab === 'ads'
-                ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
-                : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
-            }`}
-          >
-            <ImageIcon className="w-5 h-5 shrink-0" />
-            <span className="hidden sm:inline">광고 관리</span>
-          </button>
+          {/* 개발자 모드 (광고 관리 / 이벤트 및 경품 설정 / 게임 개발) */}
+          {(() => {
+            const isDevTab =
+              activeTab === 'ads' ||
+              activeTab === 'prizes' ||
+              activeTab === 'game_dev' ||
+              activeTab === 'points_dev' ||
+              activeTab === 'logs_dev';
+            const expanded = devUnlocked && (devMenuOpen || isDevTab);
+            const goDevTab = (tab: TabType) => {
+              setActiveTab(tab);
+              setDevMenuOpen(true);
+              setSaveStatus({ type: null, message: '' });
+            };
+            const subItemClass = (tab: TabType) =>
+              `w-full py-3 px-3 sm:py-3.5 sm:px-4 rounded-xl flex items-center justify-center sm:justify-start gap-3 font-bold text-sm transition-all border ${
+                activeTab === tab
+                  ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
+                  : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
+              }`;
+            return (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleDevMenuClick}
+                  className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
+                    isDevTab
+                      ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
+                      : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
+                  }`}
+                >
+                  <Wrench className="w-5 h-5 shrink-0" />
+                  <span className="hidden sm:inline flex-1 text-left">개발자 모드</span>
+                  {!devUnlocked ? (
+                    <Lock className="hidden sm:block w-4 h-4 shrink-0 text-zinc-400" />
+                  ) : expanded ? (
+                    <ChevronDown className="hidden sm:block w-4 h-4 shrink-0" />
+                  ) : (
+                    <ChevronRight className="hidden sm:block w-4 h-4 shrink-0" />
+                  )}
+                </button>
 
-          <button
-            onClick={() => { setActiveTab('prizes'); setSaveStatus({ type: null, message: '' }); }}
-            className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
-              activeTab === 'prizes'
-                ? 'bg-gradient-to-r from-pink-500/10 to-indigo-500/10 border-pink-500/30 text-pink-600 shadow-md shadow-pink-500/5'
-                : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
-            }`}
-          >
-            <SettingsIcon className="w-5 h-5 shrink-0" />
-            <span className="hidden sm:inline">이벤트 및 경품 설정</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('game_dev'); setSaveStatus({ type: null, message: '' }); }}
-            className={`w-full py-3.5 px-3 sm:py-4.5 sm:px-5 rounded-2xl flex items-center justify-center sm:justify-start gap-3.5 font-bold transition-all border ${
-              activeTab === 'game_dev'
-                ? 'bg-white border-zinc-200 text-pink-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
-                : 'bg-transparent border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200/40'
-            }`}
-          >
-            <Gamepad2 className="w-5 h-5 shrink-0" />
-            <span className="hidden sm:inline">게임 개발</span>
-          </button>
+                {expanded && (
+                  <div className="flex flex-col gap-2 sm:pl-4 sm:border-l-2 sm:border-zinc-200/70 sm:ml-3">
+                    <button onClick={() => goDevTab('ads')} className={subItemClass('ads')}>
+                      <ImageIcon className="w-5 h-5 shrink-0" />
+                      <span className="hidden sm:inline">광고 관리</span>
+                    </button>
+                    <button onClick={() => goDevTab('prizes')} className={subItemClass('prizes')}>
+                      <SettingsIcon className="w-5 h-5 shrink-0" />
+                      <span className="hidden sm:inline">이벤트 및 경품 설정</span>
+                    </button>
+                    <button onClick={() => goDevTab('game_dev')} className={subItemClass('game_dev')}>
+                      <Gamepad2 className="w-5 h-5 shrink-0" />
+                      <span className="hidden sm:inline">게임 개발</span>
+                    </button>
+                    <button onClick={() => goDevTab('points_dev')} className={subItemClass('points_dev')}>
+                      <Coins className="w-5 h-5 shrink-0" />
+                      <span className="hidden sm:inline">포인트 지급/조정</span>
+                    </button>
+                    <button onClick={() => goDevTab('logs_dev')} className={subItemClass('logs_dev')}>
+                      <Users className="w-5 h-5 shrink-0" />
+                      <span className="hidden sm:inline">참여 데이터 삭제</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </aside>
 
         {/* Tab Contents Frame */}
@@ -864,27 +1108,54 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* TAB 1: Event logs list */}
-          {activeTab === 'logs' && (
+          {/* TAB 1: Event logs list (일반 조회 + 개발자 모드 삭제) */}
+          {(activeTab === 'logs' || activeTab === 'logs_dev') && (
             <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+              {logsDeleteMode && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+                  ⚠ 개발자 모드 — 참여 데이터를 영구 삭제할 수 있습니다. 삭제된 데이터는 복구할 수 없습니다.
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="text-xl font-black text-zinc-850">이벤트 참여 고객 목록</h2>
-                  <p className="text-xs text-zinc-500 mt-1 font-medium">이벤트에 참여한 사용자들의 실시간 기록 내역입니다.</p>
+                  <h2 className="text-xl font-black text-zinc-850">
+                    {logsDeleteMode ? '참여 데이터 삭제' : '이벤트 참여 고객 목록'}
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-1 font-medium">
+                    {logsDeleteMode
+                      ? '삭제할 항목을 체크한 뒤 선택 삭제를 실행하세요. 헤더 체크는 현재 페이지 10건만 선택합니다.'
+                      : '이벤트에 참여한 사용자들의 실시간 기록 내역입니다.'}
+                  </p>
                 </div>
 
-                <button
-                  onClick={handleExportCSV}
-                  disabled={filteredLogs.length === 0}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all border ${
-                    filteredLogs.length > 0
-                      ? 'bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-700 cursor-pointer'
-                      : 'bg-zinc-100 border-zinc-200/50 text-zinc-400 cursor-not-allowed'
-                  }`}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>CSV 다운로드</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={filteredLogs.length === 0}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all border ${
+                      filteredLogs.length > 0
+                        ? 'bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-700 cursor-pointer'
+                        : 'bg-zinc-100 border-zinc-200/50 text-zinc-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>CSV 다운로드</span>
+                  </button>
+                  {logsDeleteMode && (
+                    <button
+                      onClick={handleDeleteSelectedLogs}
+                      disabled={selectedLogIds.length === 0}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all border ${
+                        selectedLogIds.length > 0
+                          ? 'bg-red-600 border-red-600 hover:bg-red-500 text-white cursor-pointer'
+                          : 'bg-zinc-100 border-zinc-200/50 text-zinc-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>선택 삭제 ({selectedLogIds.length})</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Date range filter */}
@@ -1062,6 +1333,21 @@ export default function AdminPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-500 text-[10px] uppercase font-bold tracking-wider">
+                      {logsDeleteMode && (
+                        <th className="py-3 px-3 w-12 text-center">
+                          <input
+                            type="checkbox"
+                            checked={allPageLogsSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = somePageLogsSelected;
+                            }}
+                            onChange={toggleSelectAllPageLogs}
+                            disabled={selectablePageLogIds.length === 0}
+                            title="현재 페이지 전체 선택"
+                            className="h-4 w-4 rounded border-zinc-300 text-pink-600 focus:ring-pink-500/40 cursor-pointer disabled:opacity-40"
+                          />
+                        </th>
+                      )}
                       <th className="py-3 px-4">순번</th>
                       <th className="py-3 px-4">연락처 (휴대폰 번호)</th>
                       <th className="py-3 px-4">수집·이용 동의</th>
@@ -1075,7 +1361,7 @@ export default function AdminPage() {
                   <tbody className="divide-y divide-zinc-100 text-xs font-mono text-zinc-650">
                     {filteredLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-zinc-500 font-sans font-medium">
+                        <td colSpan={logsDeleteMode ? 10 : 8} className="py-12 text-center text-zinc-500 font-sans font-medium">
                           {logAppliedRange || logAppliedPhoneDigits
                             ? '조건에 맞는 참여 기록이 없습니다.'
                             : '참여 로그 데이터가 존재하지 않습니다.'}
@@ -1086,8 +1372,28 @@ export default function AdminPage() {
                         const rowNumber = filteredLogs.length - ((safeLogPage - 1) * LOGS_PAGE_SIZE + idx);
                         const consentStatus = getConsentStatus(log.phone_number);
                         const isUpdatingConsent = consentUpdatingPhone === log.phone_number;
+                        const logId = log.id != null ? Number(log.id) : null;
+                        const canSelect = logId != null && Number.isFinite(logId);
+                        const isSelected = canSelect && selectedLogIdSet.has(logId);
                         return (
-                        <tr key={log.id ?? `${log.created_at}-${log.phone_number}-${idx}`} className="hover:bg-zinc-50/50 transition-colors">
+                        <tr
+                          key={log.id ?? `${log.created_at}-${log.phone_number}-${idx}`}
+                          className={`transition-colors ${
+                            isSelected ? 'bg-red-50/40' : 'hover:bg-zinc-50/50'
+                          }`}
+                        >
+                          {logsDeleteMode && (
+                            <td className="py-3 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={!canSelect}
+                                onChange={() => canSelect && toggleLogSelection(logId)}
+                                title={canSelect ? '삭제 대상 선택' : 'ID 없음 — 삭제 불가'}
+                                className="h-4 w-4 rounded border-zinc-300 text-pink-600 focus:ring-pink-500/40 cursor-pointer disabled:opacity-30"
+                              />
+                            </td>
+                          )}
                           <td className="py-3 px-4 text-zinc-400">{rowNumber}</td>
                           <td className="py-3 px-4 text-zinc-800 font-bold text-sm">{log.phone_number}</td>
                           <td className="py-3 px-4">
@@ -1153,14 +1459,26 @@ export default function AdminPage() {
                                 <span className={`${LOG_STATUS_BADGE} ${
                                   log.is_used
                                     ? 'bg-red-50 text-red-650 border border-red-200/50'
-                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50 animate-pulse'
+                                    : isCouponExpired(log.created_at)
+                                      ? 'bg-zinc-200 text-zinc-600 border border-zinc-300'
+                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50 animate-pulse'
                                 }`}>
-                                  {log.is_used ? '사용완료' : '미사용'}
+                                  {log.is_used
+                                    ? '사용완료'
+                                    : isCouponExpired(log.created_at)
+                                      ? '기한만료'
+                                      : '미사용'}
                                 </span>
-                                {log.is_used && log.used_at && (
+                                {log.is_used && log.used_at ? (
                                   <span className="text-[10px] font-normal leading-tight text-zinc-400">
                                     {formatLogUsedAtShort(log.used_at)}
                                   </span>
+                                ) : (
+                                  !log.is_used && (
+                                    <span className="text-[10px] font-normal leading-tight text-zinc-400">
+                                      ~{formatCouponExpiryShort(log.created_at)}
+                                    </span>
+                                  )
                                 )}
                               </div>
                             ) : (
@@ -1223,12 +1541,18 @@ export default function AdminPage() {
             </div>
           )}
 
+          {activeTab === 'points_dev' && (
+            <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 md:p-8 shadow-sm">
+              <PointsManager onStatus={handlePointsStatus} allowAdd />
+            </div>
+          )}
+
           {/* TAB 1.5: Coupons Tab */}
           {activeTab === 'coupons' && (
             <div className="bg-white border border-zinc-200/80 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="text-2xl font-black text-zinc-800">쿠폰 조회 및 사용 처리</h2>
+                  <h2 className="text-2xl font-black text-zinc-800">쿠폰 조회</h2>
                   <p className="text-sm text-zinc-500 mt-1.5 font-medium font-sans">
                     고객이 제시한 쿠폰 번호를 확인하여 사용 상태를 점검하고, 사용 완료 처리합니다.
                   </p>
@@ -1297,6 +1621,10 @@ export default function AdminPage() {
                           <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-red-50 text-red-600 border border-red-200/50">
                             사용완료
                           </span>
+                        ) : isCouponExpired(searchedCouponLog.created_at) ? (
+                          <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-zinc-200 text-zinc-600 border border-zinc-300">
+                            기한만료
+                          </span>
                         ) : (
                           <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/50 animate-pulse">
                             미사용 (사용 가능)
@@ -1314,6 +1642,18 @@ export default function AdminPage() {
                         {searchedCouponLog.phone_number}
                       </span>
                     </div>
+                    <div>
+                      <span className="text-sm text-zinc-500 font-bold uppercase tracking-wider block">사용기한</span>
+                      <span
+                        className={`text-base font-bold block mt-2 font-mono ${
+                          !searchedCouponLog.is_used && isCouponExpired(searchedCouponLog.created_at)
+                            ? 'text-zinc-500 line-through'
+                            : 'text-zinc-800'
+                        }`}
+                      >
+                        ~ {formatCouponExpiryShort(searchedCouponLog.created_at)}
+                      </span>
+                    </div>
                     {searchedCouponLog.is_used && searchedCouponLog.used_at && (
                       <div className="sm:col-span-2">
                         <span className="text-sm text-zinc-500 font-bold uppercase tracking-wider block">쿠폰 사용 일시</span>
@@ -1328,6 +1668,10 @@ export default function AdminPage() {
                     {searchedCouponLog.is_used ? (
                       <div className="text-sm font-bold text-red-600 bg-red-50 border border-red-100/60 px-5 py-3 rounded-xl">
                         ※ 이미 사용이 완료되어 재사용할 수 없는 쿠폰 번호입니다.
+                      </div>
+                    ) : isCouponExpired(searchedCouponLog.created_at) ? (
+                      <div className="text-sm font-bold text-zinc-600 bg-zinc-100 border border-zinc-300 px-5 py-3 rounded-xl">
+                        ※ 사용 기한이 만료되어 사용할 수 없는 쿠폰 번호입니다.
                       </div>
                     ) : (
                       <button
@@ -1582,6 +1926,17 @@ export default function AdminPage() {
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">%</span>
                           </div>
                         </div>
+
+                        {/* Delete prize button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePrize(idx)}
+                          disabled={prizeEdits.length <= 2}
+                          title="이 경품 삭제"
+                          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl border border-zinc-200 bg-white text-zinc-400 hover:text-red-500 hover:border-red-300 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-end md:self-center"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
                       </div>
 
                       {/* Prize image upload (same pattern as banner) */}
@@ -1656,6 +2011,16 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Add prize button */}
+                <button
+                  type="button"
+                  onClick={handleAddPrize}
+                  className="flex w-full items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-500 text-xs font-bold hover:border-pink-400/50 hover:text-pink-600 hover:bg-pink-50/40 transition-colors"
+                >
+                  <span className="text-base leading-none">＋</span>
+                  <span>경품 항목 추가 (현재 {prizeEdits.length}개)</span>
+                </button>
               </div>
 
               {/* Action buttons */}

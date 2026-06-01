@@ -26,9 +26,11 @@ function formatPhoneInput(value: string): string {
 
 interface PointsManagerProps {
   onStatus?: (status: { type: 'success' | 'error'; message: string }) => void;
+  /** 포인트 추가(지급) 버튼 노출 여부. 개발자 모드에서만 true (차감은 항상 가능) */
+  allowAdd?: boolean;
 }
 
-export default function PointsManager({ onStatus }: PointsManagerProps) {
+export default function PointsManager({ onStatus, allowAdd = false }: PointsManagerProps) {
   const mountedRef = useRef(true);
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
@@ -253,15 +255,17 @@ export default function PointsManager({ onStatus }: PointsManagerProps) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={adjusting}
-            onClick={() => handleAdjust('add')}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
-          >
-            <Plus className="w-4 h-4" />
-            포인트 추가
-          </button>
+          {allowAdd && (
+            <button
+              type="button"
+              disabled={adjusting}
+              onClick={() => handleAdjust('add')}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              포인트 추가
+            </button>
+          )}
           <button
             type="button"
             disabled={adjusting}

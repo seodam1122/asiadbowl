@@ -4,12 +4,15 @@ import {
   localMediaKeyFromRef,
   localMediaStore,
 } from './local-media-store';
+import { formatCouponExpiryLabel } from './coupon-expiry';
 
 export interface CouponImageInput {
   prizeName: string;
   prizeImageUrl: string;
   couponCode: string;
   eventTitle?: string;
+  /** 쿠폰 발행일(ISO). 사용기한(발행일+7일) 표기에 사용 */
+  createdAt?: string;
 }
 
 const CARD_WIDTH = 900;
@@ -72,7 +75,8 @@ function drawPlaceholderPrize(ctx: CanvasRenderingContext2D, x: number, y: numbe
 
 /** 당첨 쿠폰 카드 PNG 생성 (경품 이미지 + 쿠폰번호 + QR) */
 export async function generateCouponImageBlob(input: CouponImageInput): Promise<Blob> {
-  const { prizeName, couponCode, eventTitle = '이벤트 당첨 쿠폰' } = input;
+  const { prizeName, couponCode, eventTitle = '이벤트 당첨 쿠폰', createdAt } = input;
+  const expiryLabel = createdAt ? formatCouponExpiryLabel(createdAt) : '';
   const resolvedUrl = await resolvePrizeImageUrl(input.prizeImageUrl);
 
   const canvas = document.createElement('canvas');
@@ -183,7 +187,15 @@ export async function generateCouponImageBlob(input: CouponImageInput): Promise<
   ctx.fillStyle = '#71717a';
   ctx.font = '500 24px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('QR 스캔 · 쿠폰 번호 확인', CARD_WIDTH / 2, qrY + qrSize + 48);
+  ctx.fillText('QR 스캔 · 쿠폰 번호 확인', CARD_WIDTH / 2, qrY + qrSize + 44);
+
+  // 사용기한 (발행일 + 7일)
+  if (expiryLabel) {
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(expiryLabel, CARD_WIDTH / 2, qrY + qrSize + 92);
+  }
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(

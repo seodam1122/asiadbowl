@@ -33,6 +33,15 @@ interface RouletteGameProps {
 /** Same id comparison even when Supabase returns string ids */
 const samePrizeId = (a: Prize['id'], b: Prize['id']) => Number(a) === Number(b);
 
+/**
+ * 룰렛 칸 구성: 경품이 6종 이상이면 그대로 개별 표시(8종 → 8칸),
+ * 4종 이하로 적으면 휠이 비어 보이지 않도록 2배로 복제한다.
+ */
+function buildSectors(prizes: Prize[]): Prize[] {
+  if (prizes.length >= 6) return [...prizes];
+  return [...prizes, ...prizes];
+}
+
 /** Pointer is at 12 o'clock; sector 0 starts at top (matches SVG layout). */
 function getSectorIndexAtPointer(rotationDeg: number, sectorCount: number): number {
   const sectorAngle = 360 / sectorCount;
@@ -56,6 +65,8 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
     '#14b8a6', // Teal
     '#f59e0b', // Amber
     '#ef4444', // Red
+    '#0ea5e9', // Sky
+    '#84cc16', // Lime
   ];
 
   // Pick a prize based on probability distribution
@@ -78,11 +89,11 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
     const prize = pickPrizeByProbability();
     setSelectedPrize(prize);
 
-    const sectors = [...prizes, ...prizes];
+    const sectors = buildSectors(prizes);
     const sectorCount = sectors.length;
     const sectorAngle = 360 / sectorCount;
 
-    // Find all matching indices in the duplicated 8-sector array
+    // Find all matching indices in the sector array
     const matchingIndices: number[] = [];
     sectors.forEach((p, idx) => {
       if (samePrizeId(p.id, prize.id)) {
@@ -117,7 +128,7 @@ export default function RouletteGame({ prizes, onFinished }: RouletteGameProps) 
     }, 4100);
   };
 
-  const sectors = [...prizes, ...prizes];
+  const sectors = buildSectors(prizes);
   const sectorCount = sectors.length;
   const sectorAngle = 360 / sectorCount;
 

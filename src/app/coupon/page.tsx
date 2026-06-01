@@ -31,6 +31,7 @@ function CouponDownloadContent() {
       prizeName: payload.prizeName,
       prizeImageUrl: payload.prizeImageUrl,
       eventTitle: payload.eventTitle,
+      createdAt: payload.createdAt,
     };
     setCouponData(input);
     await generateAndDownloadCouponImage(input);

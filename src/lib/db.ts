@@ -1,5 +1,6 @@
 import { isKioskStoragePublicUrl } from './kiosk-storage-url';
 import { persistImageToServer } from './media-upload';
+import { isCouponExpired } from './coupon-expiry';
 import { supabase, isSupabaseConfigured } from './supabase';
 import {
   buildAprilMayDummyParticipation,
@@ -167,25 +168,49 @@ const DEFAULT_PRIZES: Prize[] = [
     id: 1,
     name: '무료 1게임',
     image_url: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400&auto=format&fit=crop&q=60',
-    probability: 35,
+    probability: 18,
   },
   {
     id: 2,
     name: '2000 point',
     image_url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=60',
-    probability: 35,
+    probability: 18,
   },
   {
     id: 3,
     name: '음료 선택권',
     image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&auto=format&fit=crop&q=60',
-    probability: 15,
+    probability: 12,
   },
   {
     id: 4,
     name: '스낵 선택권',
     image_url: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=400&auto=format&fit=crop&q=60',
-    probability: 15,
+    probability: 12,
+  },
+  {
+    id: 5,
+    name: '무료 2게임',
+    image_url: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&auto=format&fit=crop&q=60',
+    probability: 7,
+  },
+  {
+    id: 6,
+    name: '1000 point',
+    image_url: 'https://images.unsplash.com/photo-1518458028785-8fbcd101ebb9?w=400&auto=format&fit=crop&q=60',
+    probability: 13,
+  },
+  {
+    id: 7,
+    name: '볼링 양말',
+    image_url: 'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=400&auto=format&fit=crop&q=60',
+    probability: 10,
+  },
+  {
+    id: 8,
+    name: '행운권',
+    image_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400&auto=format&fit=crop&q=60',
+    probability: 10,
   },
 ];
 
@@ -494,6 +519,20 @@ export const db = {
         console.error('Supabase savePrizeList failed:', error);
         throw new Error(`서버에 경품 설정을 저장하지 못했습니다: ${error.message}`);
       }
+
+      // 목록에서 삭제된 경품은 서버에서도 제거 (upsert만으로는 남기 때문)
+      const keepIds = persisted
+        .map((prize) => Number(prize.id))
+        .filter((id) => Number.isFinite(id));
+      if (keepIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('prizes')
+          .delete()
+          .not('id', 'in', `(${keepIds.join(',')})`);
+        if (deleteError) {
+          console.error('Supabase savePrizeList delete failed:', deleteError);
+        }
+      }
     }
 
     return persisted;
@@ -674,6 +713,66 @@ export const db = {
     return getLocalData<EventLog[]>('kiosk_event_logs', []);
   },
 
+  /** 단일 이벤트 참여 로그 삭제 (개발자 모드 전용) */
+  async deleteEventLog(id: number): Promise<void> {
+    const targetId = Number(id);
+    if (!Number.isFinite(targetId)) {
+      throw new Error('삭제할 항목의 ID가 올바르지 않습니다.');
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase.from('event_logs').delete().eq('id', targetId);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase deleteEventLog failed, using fallback:', err);
+      }
+    }
+
+    const logs = getLocalData<EventLog[]>('kiosk_event_logs', []);
+    setLocalData(
+      'kiosk_event_logs',
+      logs.filter((log) => Number(log.id) !== targetId)
+    );
+  },
+
+  /** 선택한 이벤트 참여 로그 일괄 삭제 (개발자 모드 전용) */
+  async deleteEventLogs(ids: number[]): Promise<void> {
+    const uniqueIds = [...new Set(ids.map(Number).filter((id) => Number.isFinite(id)))];
+    if (uniqueIds.length === 0) {
+      throw new Error('삭제할 항목을 선택해 주세요.');
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase.from('event_logs').delete().in('id', uniqueIds);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase deleteEventLogs failed, using fallback:', err);
+      }
+    }
+
+    const idSet = new Set(uniqueIds);
+    const logs = getLocalData<EventLog[]>('kiosk_event_logs', []);
+    setLocalData(
+      'kiosk_event_logs',
+      logs.filter((log) => log.id == null || !idSet.has(Number(log.id)))
+    );
+  },
+
+  /** 전체 이벤트 참여 로그 삭제 (개발자 모드 전용) */
+  async deleteAllEventLogs(): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase.from('event_logs').delete().neq('id', -1);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase deleteAllEventLogs failed, using fallback:', err);
+      }
+    }
+    setLocalData('kiosk_event_logs', []);
+  },
+
   async addEventLog(
     phoneNumber: string,
     prize: Prize,
@@ -804,6 +903,7 @@ export const db = {
         if (fetchErr) throw fetchErr;
         if (!existing) throw new Error('쿠폰을 찾을 수 없습니다.');
         if (existing.is_used) throw new Error('이미 사용 완료된 쿠폰입니다.');
+        if (isCouponExpired(existing.created_at)) throw new Error('사용 기한이 만료된 쿠폰입니다.');
 
         const { data, error } = await supabase
           .from('event_logs')
@@ -829,6 +929,9 @@ export const db = {
       }
       if (logs[idx].is_used) {
         throw new Error('이미 사용 완료된 쿠폰입니다.');
+      }
+      if (isCouponExpired(logs[idx].created_at)) {
+        throw new Error('사용 기한이 만료된 쿠폰입니다.');
       }
       logs[idx].is_used = true;
       logs[idx].used_at = timestamp;

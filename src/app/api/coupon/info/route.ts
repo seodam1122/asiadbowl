@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   const { data: log, error: logError } = await supabase
     .from('event_logs')
-    .select('id, coupon_code, prize_name, prize_id')
+    .select('id, coupon_code, prize_name, prize_id, created_at')
     .eq('coupon_code', code)
     .maybeSingle();
 
@@ -66,5 +66,6 @@ export async function GET(request: NextRequest) {
     prizeName: log.prize_name,
     prizeImageUrl,
     eventTitle: settings?.ad_title || '이벤트 당첨 쿠폰',
+    createdAt: log.created_at,
   });
 }

@@ -12,6 +12,7 @@ import { db, KioskSettings, Prize } from '@/lib/db';
 import { requestCouponAlimtalk } from '@/lib/send-coupon-alimtalk-client';
 import { Sparkles, RefreshCw, Gift, Trophy, ArrowRight, Volume2, ChevronLeft } from 'lucide-react';
 import { generateCouponQrDataUrl } from '@/lib/coupon-qr';
+import { formatCouponExpiryLabel } from '@/lib/coupon-expiry';
 import confetti from 'canvas-confetti';
 
 type FlowStep = 'landing' | 'auth' | 'select_game' | 'game' | 'result';
@@ -25,6 +26,7 @@ export default function UserKioskPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [wonPrize, setWonPrize] = useState<Prize | null>(null);
   const [generatedCoupon, setGeneratedCoupon] = useState<string | null>(null);
+  const [couponExpiryLabel, setCouponExpiryLabel] = useState<string | null>(null);
   const [alimtalkNotice, setAlimtalkNotice] = useState<string | null>(null);
   const [couponQrDataUrl, setCouponQrDataUrl] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState<string>('roulette');
@@ -157,6 +159,7 @@ export default function UserKioskPage() {
       const log = await db.addEventLog(phoneNumber, prize, { privacyConsent: true });
       if (log && log.coupon_code) {
         setGeneratedCoupon(log.coupon_code);
+        setCouponExpiryLabel(formatCouponExpiryLabel(log.created_at));
 
         const alimtalk = await requestCouponAlimtalk({
           logId: log.id,
@@ -183,10 +186,12 @@ export default function UserKioskPage() {
         }
       } else {
         setGeneratedCoupon(null);
+        setCouponExpiryLabel(null);
       }
     } catch (err) {
       console.error('Failed to save event log:', err);
       setGeneratedCoupon(null);
+      setCouponExpiryLabel(null);
     }
   };
 
@@ -195,6 +200,7 @@ export default function UserKioskPage() {
     setPhoneNumber('');
     setWonPrize(null);
     setGeneratedCoupon(null);
+    setCouponExpiryLabel(null);
     setAlimtalkNotice(null);
     setCouponQrDataUrl(null);
     // Reload configurations in case admin changed active game or ads
@@ -229,7 +235,7 @@ export default function UserKioskPage() {
       {step === 'landing' && (
         <div className="relative flex min-h-0 flex-1 flex-col justify-between overflow-hidden bg-zinc-950 select-none">
           {/* Full Screen Ad Background Image */}
-          <KioskPortraitImage src={adImageUrl} alt="Promotion banner" />
+          <KioskPortraitImage src={adImageUrl} alt="Promotion banner" className="translate-y-20" />
 
           {/* Ad text block and button overlayed on top */}
           <div className="relative z-10 flex min-h-0 flex-1 flex-col px-6 pb-8 pt-16">
@@ -243,6 +249,13 @@ export default function UserKioskPage() {
               </p>
             </div>
 
+            {/* 카드 아래 강조 문구 — 키네틱 시머 그라데이션 (골드/네온) + 등장 인트로 */}
+            <div className="shimmer-intro mt-12 flex justify-center">
+              <span className="shimmer-sign text-[120px] leading-none sm:text-[144px]">
+                꽝 없는 게임
+              </span>
+            </div>
+
             {/* Glowing Touch to Start Button */}
             <div className="mt-auto mb-24 w-full">
               <button
@@ -254,13 +267,13 @@ export default function UserKioskPage() {
                 <ArrowRight className="h-16 w-16 shrink-0 animate-pulse" />
               </button>
               <p
-                className="mt-6 text-center text-3xl font-black leading-tight tracking-tight text-zinc-900 sm:text-4xl"
+                className="mt-6 whitespace-nowrap text-center text-[34px] font-black leading-tight tracking-tight text-zinc-900 sm:text-[46px]"
                 style={{
                   WebkitTextStroke: '1px rgba(254, 243, 199, 0.95)',
                   paintOrder: 'stroke fill',
                 }}
               >
-                * 본 이벤트는 1인 1일 1회만 참여 가능합니다.
+                본 이벤트는 <span className="text-pink-600">정상가 3게임 이상</span> 이용 시 참여 가능합니다.
               </p>
             </div>
           </div>
@@ -433,6 +446,11 @@ export default function UserKioskPage() {
                     <span className="mt-2 font-mono text-4xl font-black tracking-wider text-pink-700">
                       {generatedCoupon}
                     </span>
+                    {couponExpiryLabel && (
+                      <span className="mt-3 text-xl font-bold text-rose-600">
+                        {couponExpiryLabel}
+                      </span>
+                    )}
                   </div>
                 )}
                 {alimtalkNotice && (

@@ -156,6 +156,69 @@ body {
   transition: transform 0.1s ease;
 }
 
+/* "꽝 없는 게임" — 주기적으로 부드럽게 나타났다 사라지는 페이드 인/아웃 (래퍼에 적용) */
+.shimmer-intro {
+  transform-origin: center;
+  animation: shimmer-cycle 9s ease-in-out infinite;
+}
+
+@keyframes shimmer-cycle {
+  0%   { opacity: 0; transform: scale(0.9); }   /* 사라진 상태 */
+  8%   { opacity: 1; transform: scale(1); }      /* 부드럽게 등장 */
+  82%  { opacity: 1; transform: scale(1); }      /* 오래 유지 */
+  93%  { opacity: 0; transform: scale(0.94); }   /* 부드럽게 사라짐 */
+  100% { opacity: 0; transform: scale(0.9); }    /* 잠시 비어 있음 (루프 연결) */
+}
+
+/* "꽝 없는 게임" 강조 문구 — 키네틱 시머 그라데이션 (Kinetic Shimmer / 어두운 배경용 골드·네온) */
+.shimmer-sign {
+  display: inline-block;
+  position: relative;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  /* 밝은 골드 기본색(항상 또렷) + 좌→우로 지나가는 흰빛 하이라이트 밴드 */
+  background-image: linear-gradient(
+    100deg,
+    #ffc21a 0%,
+    #ffd24a 30%,
+    #fff2bf 46%,
+    #ffffff 50%,
+    #fff2bf 54%,
+    #ffd24a 70%,
+    #ffc21a 100%
+  );
+  background-size: 300% auto;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* 클립된 글자에 골드 네온 글로우 */
+  filter:
+    drop-shadow(0 0 10px rgba(255, 196, 0, 0.55))
+    drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  /* 흰빛이 멈춤 없이 계속 좌우로 흐르며 반짝임 — 표시되는 동안 항상 지속 */
+  animation:
+    shimmer-sweep 3s ease-in-out infinite,
+    shimmer-float 6s ease-in-out infinite;
+}
+
+/*
+ * 0% ~ 100% 사이에서만 움직인다(= 항상 그라데이션 이미지 안 → 글자가 사라지지 않음).
+ * 멈춤 구간 없이 정방향 → 역방향(왕복)으로 흰빛이 계속 흘러 끊김 없이 반짝인다.
+ */
+@keyframes shimmer-sweep {
+  0%   { background-position: 0% center; }    /* 흰빛 왼쪽 밖 */
+  50%  { background-position: 100% center; }  /* 흰빛이 글자를 통과 */
+  100% { background-position: 0% center; }    /* 되돌아오며 한 번 더 통과 (루프 연결) */
+}
+
+/* 글자는 거의 고정, 아주 미세하게만 일렁임 */
+@keyframes shimmer-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-3px) scale(1.012); }
+}
+
 /* Roulette custom wheel classes */
 .roulette-transition {
   transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
