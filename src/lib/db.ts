@@ -3,10 +3,6 @@ import { persistImageToServer } from './media-upload';
 import { isCouponExpired } from './coupon-expiry';
 import { supabase, isSupabaseConfigured } from './supabase';
 import {
-  buildAprilMayDummyParticipation,
-  type DummySeedResult,
-} from './seed-dummy-participation';
-import {
   pointsFromPrizeName,
   type CustomerPoints,
   type PointTransaction,
@@ -22,9 +18,6 @@ export interface UseCouponResult {
   balanceAfter: number;
 }
 
-export type { DummySeedResult } from './seed-dummy-participation';
-
-const APR_MAY_DUMMY_SEED_FLAG_PREFIX = 'kiosk_apr_may_dummy_seeded_';
 import {
   isDataUrl,
   isLocalMediaRef,
@@ -1187,6 +1180,22 @@ export const db = {
     return { account, transaction: savedTx };
   },
 
+  /** 모든 포인트 기록 및 잔액 전체 삭제 (개발자 모드 전용) */
+  async deleteAllPoints(): Promise<void> {
+    if (isSupabaseConfigured) {
+      const res = await fetch('/api/admin/delete-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || '포인트 전체 삭제 중 오류가 발생했습니다.');
+      }
+    }
+    setLocalData(CUSTOMER_POINTS_KEY, []);
+    setLocalData(POINT_TRANSACTIONS_KEY, []);
+  },
+
   async creditPointsForCouponUse(params: {
     phoneNumber: string;
     prizeName: string;
@@ -1338,123 +1347,5 @@ export const db = {
       alimtalk_error: options?.error ?? null,
     };
     setLocalData('kiosk_event_logs', logs);
-  },
-
-  /** 4~5월 임의 연락처 참여 더미 데이터 (최초 1회 자동, 관리자에서 재생성 가능) */
-  async seedAprilMayDummyData(options?: {
-    year?: number;
-    force?: boolean;
-  }): Promise<DummySeedResult> {
-    if (!isBrowser) {
-      return { logsAdded: 0, consentsAdded: 0, consentsUpdated: 0 };
-    }
-
-    const year = options?.year ?? new Date().getFullYear();
-    const flagKey = `${APR_MAY_DUMMY_SEED_FLAG_PREFIX}${year}`;
-
-    if (!options?.force && localStorage.getItem(flagKey)) {
-      return { logsAdded: 0, consentsAdded: 0, consentsUpdated: 0 };
-    }
-
-    const salt = options?.force ? Date.now() % 1_000_000 : 0;
-    const { logs: seedLogs, consents: seedConsents } = buildAprilMayDummyParticipation(
-      year,
-      52,
-      salt
-    );
-    const existingLogs = await this.getEventLogs();
-    const existingCoupons = new Set(
-      existingLogs.map((l) => l.coupon_code).filter((c): c is string => Boolean(c))
-    );
-    const logsToInsert = seedLogs.filter(
-      (l) => l.coupon_code && !existingCoupons.has(l.coupon_code)
-    );
-
-    let logsAdded = 0;
-    let consentsAdded = 0;
-    let consentsUpdated = 0;
-
-    let supabaseLogsOk = false;
-
-    if (isSupabaseConfigured && supabase && logsToInsert.length > 0) {
-      try {
-        const rows = logsToInsert.map((log) => ({
-          phone_number: normalizePhoneNumber(log.phone_number),
-          prize_name: log.prize_name,
-          prize_id: log.prize_id,
-          coupon_code: log.coupon_code,
-          is_used: log.is_used ?? false,
-          used_at: log.used_at ?? null,
-          privacy_consent: log.privacy_consent ?? true,
-          created_at: log.created_at,
-        }));
-        const { error } = await supabase.from('event_logs').insert(rows);
-        if (error) throw error;
-        logsAdded = logsToInsert.length;
-        supabaseLogsOk = true;
-      } catch (err) {
-        console.error('Supabase seedAprilMayDummyData (logs) failed:', err);
-      }
-    }
-
-    if (!supabaseLogsOk && logsToInsert.length > 0) {
-      const localLogs = getLocalData<EventLog[]>('kiosk_event_logs', []);
-      let maxId = localLogs.reduce((max, log) => Math.max(max, log.id ?? 0), 0);
-      for (const log of logsToInsert) {
-        maxId += 1;
-        localLogs.push({
-          ...log,
-          id: maxId,
-          phone_number: normalizePhoneNumber(log.phone_number),
-        });
-      }
-      localLogs.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      setLocalData('kiosk_event_logs', localLogs);
-      logsAdded = logsToInsert.length;
-    }
-
-    const existingConsents = await this.getContactConsents();
-    const consentByPhone = new Map(
-      existingConsents.map((c) => [normalizePhoneNumber(c.phone_number), c])
-    );
-    const localConsentAdds: ContactConsent[] = [];
-
-    for (const seedConsent of seedConsents) {
-      const phone = normalizePhoneNumber(seedConsent.phone_number);
-      const existing = consentByPhone.get(phone);
-      const record = { ...seedConsent, phone_number: phone };
-
-      if (!existing) {
-        let saved = false;
-        if (isSupabaseConfigured && supabase) {
-          try {
-            const { error } = await supabase.from('contact_consents').upsert(record);
-            if (error) throw error;
-            saved = true;
-          } catch (err) {
-            console.error('Supabase seedAprilMayDummyData (consent) failed:', err);
-          }
-        }
-
-        if (!saved) {
-          localConsentAdds.push(record);
-        }
-        consentByPhone.set(phone, record);
-        consentsAdded += 1;
-      } else {
-        consentsUpdated += 1;
-      }
-    }
-
-    if (localConsentAdds.length > 0) {
-      const localConsents = getLocalData<ContactConsent[]>(CONTACT_CONSENTS_KEY, []);
-      setLocalData(CONTACT_CONSENTS_KEY, [...localConsents, ...localConsentAdds]);
-    }
-
-    localStorage.setItem(flagKey, String(Date.now()));
-
-    return { logsAdded, consentsAdded, consentsUpdated };
   },
 };

@@ -9,7 +9,7 @@ import {
   type PointsStorageMode,
 } from '@/lib/db';
 import { pointsFromPrizeName } from '@/lib/points';
-import { Coins, Minus, Plus, RefreshCw, Search } from 'lucide-react';
+import { Coins, Minus, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 
 const TX_LABEL: Record<string, string> = {
   coupon_earn: '쿠폰 적립',
@@ -147,6 +147,33 @@ export default function PointsManager({ onStatus, allowAdd = false }: PointsMana
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!window.confirm('정말 모든 포인트 내역(잔액 및 거래 기록)을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await db.deleteAllPoints();
+      if (!mountedRef.current) return;
+      setAdjustPhone('');
+      setSelectedPhone(null);
+      await refresh();
+      if (!mountedRef.current) return;
+      onStatusRef.current?.({ type: 'success', message: '모든 포인트 내역이 삭제되었습니다.' });
+    } catch (err) {
+      if (mountedRef.current) {
+        onStatusRef.current?.({
+          type: 'error',
+          message: err instanceof Error ? err.message : '포인트 내역 삭제에 실패했습니다.',
+        });
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {tablesMissing && (
@@ -275,6 +302,17 @@ export default function PointsManager({ onStatus, allowAdd = false }: PointsMana
             <Minus className="w-4 h-4" />
             포인트 차감
           </button>
+          {allowAdd && (
+            <button
+              type="button"
+              disabled={loading || adjusting}
+              onClick={handleDeleteAll}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold disabled:opacity-50 ml-auto"
+            >
+              <Trash2 className="w-4 h-4" />
+              전체 내역 삭제
+            </button>
+          )}
         </div>
       </div>
 

@@ -364,8 +364,6 @@ export default function AdminPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const year = new Date().getFullYear();
-        const seedResult = await db.seedAprilMayDummyData({ year });
         const [fetchedLogs, fetchedSettings, fetchedPrizes, fetchedConsents] = await Promise.all([
           db.getEventLogs(),
           db.getSettings(),
@@ -377,10 +375,6 @@ export default function AdminPage() {
         setConsentMap(fetchedConsents);
         setSettings(fetchedSettings);
         setPrizes(fetchedPrizes);
-        
-        if (seedResult.logsAdded > 0) {
-          applyLogRange(`${year}-04-01`, `${year}-05-31`);
-        }
 
         // Populate form fields
         setAdTitle(fetchedSettings.ad_title);
