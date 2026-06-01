@@ -10,7 +10,7 @@ import SpotDifferenceGame from '@/components/SpotDifferenceGame';
 import HiddenObjectGame from '@/components/HiddenObjectGame';
 import { db, KioskSettings, Prize } from '@/lib/db';
 import { requestCouponAlimtalk } from '@/lib/send-coupon-alimtalk-client';
-import { Sparkles, RefreshCw, Gift, Trophy, ArrowRight, Volume2, ChevronLeft } from 'lucide-react';
+import { Sparkles, RefreshCw, Gift, Trophy, ArrowRight, Volume2, ChevronLeft, AlertCircle } from 'lucide-react';
 import { generateCouponQrDataUrl } from '@/lib/coupon-qr';
 import { formatCouponExpiryLabel } from '@/lib/coupon-expiry';
 import confetti from 'canvas-confetti';
@@ -28,6 +28,7 @@ export default function UserKioskPage() {
   const [generatedCoupon, setGeneratedCoupon] = useState<string | null>(null);
   const [couponExpiryLabel, setCouponExpiryLabel] = useState<string | null>(null);
   const [alimtalkNotice, setAlimtalkNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [couponQrDataUrl, setCouponQrDataUrl] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState<string>('roulette');
   const [gameSession, setGameSession] = useState(0);
@@ -135,6 +136,7 @@ export default function UserKioskPage() {
     // Use the prize object from the game draw (avoid stale/mismatched DB lookup by id)
     setWonPrize(prize);
     setStep('result');
+    setSaveError(null);
 
     // Trigger celebratory confetti for winning prizes
     if (prize && !prize.name.includes('꽝') && !prize.name.includes('다음 기회에')) {
@@ -190,6 +192,8 @@ export default function UserKioskPage() {
       }
     } catch (err) {
       console.error('Failed to save event log:', err);
+      const message = err instanceof Error ? err.message : '데이터 저장에 실패했습니다.';
+      setSaveError(message);
       setGeneratedCoupon(null);
       setCouponExpiryLabel(null);
     }
@@ -203,6 +207,7 @@ export default function UserKioskPage() {
     setCouponExpiryLabel(null);
     setAlimtalkNotice(null);
     setCouponQrDataUrl(null);
+    setSaveError(null);
     // Reload configurations in case admin changed active game or ads
     db.getSettings().then((s) => setSettings(s));
     db.getPrizes().then((p) => setPrizes(p));
@@ -460,6 +465,24 @@ export default function UserKioskPage() {
                 )}
               </div>
             </div>
+
+            {/* 저장 오류 메시지 */}
+            {saveError && (
+              <div className="w-full px-2">
+                <div className="flex items-start gap-4 rounded-2xl border-2 border-red-300 bg-red-50 p-6">
+                  <AlertCircle className="mt-0.5 h-8 w-8 shrink-0 text-red-500" />
+                  <div>
+                    <p className="text-xl font-bold text-red-700">참여 기록 저장 실패</p>
+                    <p className="mt-1 text-lg leading-relaxed text-red-600">
+                      {saveError}
+                    </p>
+                    <p className="mt-2 text-base text-red-500">
+                      직원에게 문의해 주세요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Coupon download QR — 이미지 크기(w-44) 유지 */}
             {isWinningPrize(wonPrize) && generatedCoupon && (

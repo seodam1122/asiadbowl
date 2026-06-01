@@ -72,6 +72,7 @@ CREATE POLICY "Allow public read access to event_logs" ON public.event_logs FOR 
 CREATE POLICY "Allow public write access to event_logs" ON public.event_logs FOR INSERT WITH CHECK (true);
 -- Allow public updates to event_logs for coupon validation
 CREATE POLICY "Allow public update access to event_logs" ON public.event_logs FOR UPDATE USING (true);
+-- NOTE: DELETE 정책 없음 — 삭제는 서버 API(/api/admin/delete-logs)에서 service_role 키로만 수행
 
 -- Index for phone number search optimization
 CREATE INDEX IF NOT EXISTS idx_event_logs_phone_date ON public.event_logs (phone_number, created_at);

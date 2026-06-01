@@ -720,12 +720,15 @@ export const db = {
       throw new Error('삭제할 항목의 ID가 올바르지 않습니다.');
     }
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.from('event_logs').delete().eq('id', targetId);
-        if (error) throw error;
-      } catch (err) {
-        console.error('Supabase deleteEventLog failed, using fallback:', err);
+    if (isSupabaseConfigured) {
+      const res = await fetch('/api/admin/delete-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [targetId] }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || '삭제 중 오류가 발생했습니다.');
       }
     }
 
@@ -743,12 +746,15 @@ export const db = {
       throw new Error('삭제할 항목을 선택해 주세요.');
     }
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.from('event_logs').delete().in('id', uniqueIds);
-        if (error) throw error;
-      } catch (err) {
-        console.error('Supabase deleteEventLogs failed, using fallback:', err);
+    if (isSupabaseConfigured) {
+      const res = await fetch('/api/admin/delete-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: uniqueIds }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || '삭제 중 오류가 발생했습니다.');
       }
     }
 
@@ -762,12 +768,15 @@ export const db = {
 
   /** 전체 이벤트 참여 로그 삭제 (개발자 모드 전용) */
   async deleteAllEventLogs(): Promise<void> {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.from('event_logs').delete().neq('id', -1);
-        if (error) throw error;
-      } catch (err) {
-        console.error('Supabase deleteAllEventLogs failed, using fallback:', err);
+    if (isSupabaseConfigured) {
+      const res = await fetch('/api/admin/delete-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteAll: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || '전체 삭제 중 오류가 발생했습니다.');
       }
     }
     setLocalData('kiosk_event_logs', []);
@@ -788,15 +797,19 @@ export const db = {
 
     // Generate coupon code if the prize is valid (not try again/fail)
     const isPrize = !prize.name.includes('꽝') && !prize.name.includes('다음 기회에');
-    let couponCode = null;
-    if (isPrize) {
+
+    function generateCouponCode(): string {
       const part1 = Math.floor(1000 + Math.random() * 9000);
       const part2 = Math.floor(1000 + Math.random() * 9000);
-      couponCode = `C-${part1}-${part2}`;
+      return `C-${part1}-${part2}`;
     }
 
+    let couponCode: string | null = isPrize ? generateCouponCode() : null;
+
     if (isSupabaseConfigured && supabase) {
-      try {
+      // Supabase가 연결된 경우 — 실패하면 에러를 상위로 전파 (silent fallback 금지)
+      const MAX_RETRIES = 3;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         const { data, error } = await supabase
           .from('event_logs')
           .insert({
@@ -811,13 +824,30 @@ export const db = {
           })
           .select()
           .single();
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        console.error('Supabase addEventLog failed, using fallback:', err);
+
+        if (!error) {
+          return data;
+        }
+
+        // 쿠폰 코드 UNIQUE 충돌 시 재시도
+        const isDuplicateCoupon =
+          couponCode &&
+          (error.code === '23505' || error.message?.includes('coupon_code'));
+        if (isDuplicateCoupon && attempt < MAX_RETRIES - 1) {
+          couponCode = generateCouponCode();
+          console.warn(`[Kiosk] 쿠폰 코드 충돌 — 새 코드로 재시도 (${attempt + 1}/${MAX_RETRIES}):`, couponCode);
+          continue;
+        }
+
+        // 재시도 불가능한 에러 → throw
+        console.error('[Kiosk] Supabase addEventLog 실패:', error);
+        throw new Error(
+          `이벤트 참여 기록 저장에 실패했습니다: ${error.message || '알 수 없는 오류'}`
+        );
       }
     }
 
+    // Supabase 미연결 시에만 localStorage fallback
     const logs = getLocalData<EventLog[]>('kiosk_event_logs', []);
     const newLog: EventLog = {
       id: logs.length + 1,
